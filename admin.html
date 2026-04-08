@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — Dishify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <style>
+    :root {
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --gold-dim: rgba(201,168,76,0.12);
+      --ink: #070604;
+      --ink2: #0e0d0a;
+      --ink3: #181510;
+      --cream: #f0e8d5;
+      --cream-dim: rgba(240,232,213,0.55);
+      --green: #4caf7d;
+      --red: #bf4040;
+    }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--ink); color:var(--cream); font-family:'Outfit',sans-serif; min-height:100vh; }
+
+    /* ── LOGIN SCREEN ── */
+    #login-screen {
+      position:fixed; inset:0; z-index:1000;
+      background:var(--ink);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .login-box {
+      background:var(--ink2); border:1px solid #2a2520;
+      border-radius:8px; padding:60px 50px; width:420px; max-width:90vw;
+      text-align:center;
+    }
+    .login-logo { font-family:'Cormorant Garamond',serif; font-size:3rem; font-weight:300; color:var(--gold); letter-spacing:0.1em; margin-bottom:8px; }
+    .login-sub { font-size:0.75rem; letter-spacing:0.35em; text-transform:uppercase; color:var(--cream-dim); margin-bottom:40px; }
+    .login-label { display:block; text-align:left; font-size:0.72rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; }
+    .login-input {
+      width:100%; padding:14px 18px; background:#13110d; border:1px solid #3a3020;
+      color:var(--cream); border-radius:3px; font-family:'Outfit',sans-serif; font-size:0.95rem;
+      margin-bottom:24px; transition:border-color 0.2s;
+    }
+    .login-input:focus { outline:none; border-color:var(--gold); }
+    .login-btn {
+      width:100%; padding:15px; background:var(--gold); color:var(--ink);
+      border:none; border-radius:3px; font-family:'Outfit',sans-serif;
+      font-weight:600; font-size:0.85rem; letter-spacing:0.15em; text-transform:uppercase;
+      cursor:pointer; transition:all 0.3s;
+    }
+    .login-btn:hover { background:var(--gold-light); }
+    .login-err { color:var(--red); font-size:0.82rem; margin-top:14px; display:none; }
+
+    /* ── ADMIN LAYOUT ── */
+    #admin-app { display:none; }
+    .sidebar {
+      width:260px; background:var(--ink2); border-right:1px solid #2a2520;
+      position:fixed; top:0; left:0; height:100vh;
+      display:flex; flex-direction:column;
+      z-index:50;
+    }
+    .sidebar-logo { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:300; color:var(--gold); padding:32px 30px 8px; letter-spacing:0.1em; }
+    .sidebar-role { font-size:0.65rem; letter-spacing:0.35em; color:var(--cream-dim); text-transform:uppercase; padding:0 30px 28px; border-bottom:1px solid #2a2520; }
+    .nav-section { padding:20px 0; flex:1; }
+    .nav-label { font-size:0.6rem; letter-spacing:0.4em; text-transform:uppercase; color:var(--cream-dim); padding:10px 30px 6px; }
+    .nav-item {
+      display:flex; align-items:center; gap:12px;
+      padding:13px 30px; color:#888; cursor:pointer;
+      transition:all 0.25s; font-size:0.88rem; font-weight:400;
+      border-left:3px solid transparent;
+    }
+    .nav-item:hover { color:var(--cream); background:rgba(255,255,255,0.03); }
+    .nav-item.active { color:var(--gold); background:var(--gold-dim); border-left-color:var(--gold); }
+    .sidebar-footer { padding:20px 30px; border-top:1px solid #2a2520; }
+    .logout-btn { width:100%; padding:10px; background:transparent; border:1px solid #3a3020; color:var(--cream-dim); border-radius:3px; font-family:'Outfit',sans-serif; font-size:0.78rem; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; transition:all 0.25s; }
+    .logout-btn:hover { border-color:var(--red); color:var(--red); }
+
+    .main { margin-left:260px; padding:50px; min-height:100vh; }
+    .page-title { font-family:'Cormorant Garamond',serif; font-size:2.4rem; font-weight:300; color:var(--cream); margin-bottom:4px; }
+    .page-subtitle { font-size:0.78rem; color:var(--cream-dim); letter-spacing:0.05em; margin-bottom:40px; }
+
+    .panel { display:none; animation:fadeIn 0.35s ease; }
+    .panel.active { display:block; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── CARDS ── */
+    .card { background:var(--ink2); border:1px solid #2a2520; border-radius:6px; padding:32px; margin-bottom:24px; }
+    .card-title { font-family:'Cormorant Garamond',serif; font-size:1.2rem; font-weight:400; color:var(--gold); margin-bottom:20px; display:flex; align-items:center; gap:10px; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; }
+
+    label { display:block; font-size:0.7rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
+    input, select, textarea {
+      width:100%; padding:12px 16px; background:#13110d;
+      border:1px solid #3a3020; color:var(--cream);
+      border-radius:3px; font-family:'Outfit',sans-serif; font-size:0.9rem;
+      transition:border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { outline:none; border-color:var(--gold); }
+    select option { background:#13110d; }
+    textarea { resize:vertical; min-height:90px; }
+    .form-group { margin-bottom:18px; }
+    .checkbox-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .checkbox-row input[type=checkbox] { width:auto; accent-color:var(--gold); }
+    .checkbox-row label { margin:0; font-size:0.8rem; text-transform:none; letter-spacing:0; color:var(--cream-dim); }
+
+    .btn { padding:12px 28px; border:none; border-radius:3px; font-family:'Outfit',sans-serif; font-weight:600; font-size:0.82rem; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; transition:all 0.25s; }
+    .btn-gold { background:var(--gold); color:var(--ink); }
+    .btn-gold:hover { background:var(--gold-light); transform:translateY(-1px); }
+    .btn-outline { background:transparent; border:1px solid #3a3020; color:var(--cream-dim); }
+    .btn-outline:hover { border-color:var(--gold); color:var(--gold); }
+    .btn-red { background:transparent; border:1px solid rgba(191,64,64,0.4); color:var(--red); font-size:0.72rem; padding:6px 14px; }
+    .btn-red:hover { background:rgba(191,64,64,0.1); }
+    .btn-sm { padding:7px 16px; font-size:0.72rem; }
+
+    /* ── TABLE ── */
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:0.65rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); border-bottom:1px solid #2a2520; padding:12px 16px; font-weight:500; }
+    td { padding:14px 16px; border-bottom:1px solid #1a1810; font-size:0.88rem; color:var(--cream-dim); vertical-align:middle; }
+    tbody tr:hover td { background:rgba(201,168,76,0.03); color:var(--cream); }
+    .empty-row td { text-align:center; padding:40px; color:var(--cream-dim); font-style:italic; }
+
+    /* ── QR ── */
+    .qr-wrap { background:white; padding:16px; border-radius:8px; width:fit-content; margin:24px 0; }
+    .qr-url { font-size:0.72rem; color:var(--cream-dim); word-break:break-all; margin-top:12px; padding:10px 14px; background:#13110d; border-radius:3px; border:1px solid #2a2520; }
+
+    /* ── STATS ── */
+    .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-bottom:32px; }
+    .stat-card { background:var(--ink2); border:1px solid #2a2520; border-radius:6px; padding:28px; }
+    .stat-val { font-family:'Cormorant Garamond',serif; font-size:3rem; font-weight:300; color:var(--gold); line-height:1; }
+    .stat-label { font-size:0.7rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--cream-dim); margin-top:6px; }
+
+    /* ── SEED BANNER ── */
+    .seed-banner { background:rgba(201,168,76,0.08); border:1px solid rgba(201,168,76,0.25); border-radius:6px; padding:20px 24px; margin-bottom:32px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .seed-banner p { font-size:0.85rem; color:var(--cream-dim); line-height:1.5; }
+    .seed-banner strong { color:var(--gold); }
+
+    /* Toast */
+    .toast { position:fixed; bottom:30px; right:30px; background:var(--ink3); border:1px solid var(--gold); color:var(--cream); padding:14px 22px; border-radius:4px; font-size:0.85rem; z-index:2000; animation:toastSlide 0.3s ease; }
+    @keyframes toastSlide { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+
+    @media(max-width:900px) { .grid-2,.grid-3{grid-template-columns:1fr} .stats-row{grid-template-columns:1fr 1fr} }
+    @media(max-width:700px) { .sidebar{display:none} .main{margin-left:0;padding:20px} }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="login-screen">
+    <div class="login-box">
+      <div class="login-logo">DISHIFY</div>
+      <div class="login-sub">Admin Access</div>
+      <label class="login-label">Password</label>
+      <input class="login-input" type="password" id="pwd-input" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')login()">
+      <button class="login-btn" onclick="login()">Unlock Dashboard</button>
+      <div class="login-err" id="login-err">Incorrect password. Try again.</div>
+    </div>
+  </div>
+
+  <!-- ADMIN APP -->
+  <div id="admin-app">
+    <div class="sidebar">
+      <div>
+        <div class="sidebar-logo">DISHIFY</div>
+        <div class="sidebar-role">✦ Owner Dashboard</div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Overview</div>
+        <div class="nav-item active" onclick="showPanel('dashboard',this)"><span>📊</span> Dashboard</div>
+        <div class="nav-label">Manage</div>
+        <div class="nav-item" onclick="showPanel('restaurants',this)"><span>🏢</span> Restaurants</div>
+        <div class="nav-item" onclick="showPanel('menu',this)"><span>🍽️</span> Menu Editor</div>
+        <div class="nav-item" onclick="showPanel('qr',this)"><span>📱</span> QR Codes</div>
+      </div>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- DASHBOARD -->
+      <div class="panel active" id="panel-dashboard">
+        <div class="page-title">Dashboard</div>
+        <div class="page-subtitle">Welcome back. Here's your overview.</div>
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-val" id="stat-restaurants">—</div><div class="stat-label">Restaurants</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-items">—</div><div class="stat-label">Menu Items</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-ar">—</div><div class="stat-label">AR Models</div></div>
+        </div>
+        <div class="seed-banner" id="seed-banner">
+          <p><strong>No data yet?</strong> Click the button to instantly seed the database with a sample restaurant (Casa Bella) with 8 menu items and real AR 3D food models.</p>
+          <button class="btn btn-gold" onclick="seedDatabase()">Seed Sample Data</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 Quick Guide</div>
+          <p style="font-size:0.85rem;color:var(--cream-dim);line-height:1.8">
+            1. Go to <strong style="color:var(--gold)">Restaurants</strong> and add your venue.<br>
+            2. Go to <strong style="color:var(--gold)">Menu Editor</strong> and add items. Paste a <code>.glb</code> URL to enable AR viewing.<br>
+            3. Go to <strong style="color:var(--gold)">QR Codes</strong> to generate and download your table QR.<br>
+            4. Guests scan the QR → see the menu → tap "View AR" to place food on their table!
+          </p>
+        </div>
+      </div>
+
+      <!-- RESTAURANTS -->
+      <div class="panel" id="panel-restaurants">
+        <div class="page-title">Restaurants</div>
+        <div class="page-subtitle">Add and manage your restaurant venues.</div>
+        <div class="card">
+          <div class="card-title">➕ Add New Restaurant</div>
+          <div class="grid-2">
+            <div class="form-group"><label>Restaurant Name</label><input id="rest-name" placeholder="e.g. Casa Bella"></div>
+            <div class="form-group"><label>Emoji</label><input id="rest-emoji" placeholder="e.g. 🍕"></div>
+            <div class="form-group"><label>Cuisine Type</label>
+              <select id="rest-cuisine">
+                <option value="Italian">Italian</option>
+                <option value="Pakistani">Pakistani</option>
+                <option value="Japanese">Japanese</option>
+                <option value="American">American</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Mexican">Mexican</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Description (optional)</label><input id="rest-desc" placeholder="Short tagline…"></div>
+          </div>
+          <button class="btn btn-gold" onclick="addRestaurant()">Save Restaurant</button>
+        </div>
+        <div class="card">
+          <div class="card-title">🏢 Your Restaurants</div>
+          <table><thead><tr><th>Name</th><th>Cuisine</th><th>Menu Items</th><th>Actions</th></tr></thead>
+          <tbody id="rest-list-body"><tr class="empty-row"><td colspan="4">No restaurants yet</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- MENU EDITOR -->
+      <div class="panel" id="panel-menu">
+        <div class="page-title">Menu Editor</div>
+        <div class="page-subtitle">Add and manage menu items with optional AR 3D models.</div>
+        <div class="card">
+          <div class="card-title">➕ Add Menu Item</div>
+          <div class="form-group"><label>Restaurant</label><select id="menu-rest"></select></div>
+          <div class="grid-3">
+            <div class="form-group"><label>Item Name</label><input id="item-name" placeholder="e.g. Margherita Pizza"></div>
+            <div class="form-group"><label>Category</label><input id="item-cat" placeholder="e.g. Starters, Mains…"></div>
+            <div class="form-group"><label>Price (PKR)</label><input type="number" id="item-price" placeholder="e.g. 850"></div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group"><label>Emoji</label><input id="item-emoji" placeholder="🍕"></div>
+            <div class="form-group"><label>AR Model URL (.glb file)</label><input id="item-model" placeholder="https://example.com/model.glb"></div>
+          </div>
+          <div class="form-group"><label>Description</label><textarea id="item-desc" placeholder="Describe the dish…"></textarea></div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+            <div class="checkbox-row"><input type="checkbox" id="item-spicy"><label for="item-spicy">🌶 Spicy</label></div>
+            <div class="checkbox-row"><input type="checkbox" id="item-veg"><label for="item-veg">🌿 Vegetarian</label></div>
+          </div>
+          <button class="btn btn-gold" onclick="addMenuItem()">Add to Menu</button>
+        </div>
+        <div class="card">
+          <div class="card-title">🍽️ Current Menu Items</div>
+          <div class="form-group" style="max-width:300px"><label>Filter by Restaurant</label><select id="menu-filter" onchange="filterMenu()"></select></div>
+          <table><thead><tr><th>Item</th><th>Category</th><th>Price</th><th>AR</th><th>Actions</th></tr></thead>
+          <tbody id="menu-list-body"><tr class="empty-row"><td colspan="5">Select a restaurant</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- QR -->
+      <div class="panel" id="panel-qr">
+        <div class="page-title">QR Codes</div>
+        <div class="page-subtitle">Generate table QR codes that take guests straight to the menu.</div>
+        <div class="card">
+          <div class="card-title">📱 Generate QR Code</div>
+          <div class="form-group" style="max-width:300px"><label>Select Restaurant</label><select id="qr-restaurant" onchange="generateQR()"></select></div>
+          <div class="qr-wrap"><div id="qrcode" style="width:200px;height:200px"></div></div>
+          <div class="qr-url" id="qr-url" style="display:none"></div>
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-gold" onclick="downloadQR()">Download PNG</button>
+            <button class="btn btn-outline" onclick="copyQRUrl()">Copy URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── CONFIG ──
+    // Change ADMIN_PASSWORD to your own secret!
+    const ADMIN_PASSWORD = 'dishify2024';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",
+      authDomain: "dishify-menu.firebaseapp.com",
+      databaseURL: "https://dishify-menu-default-rtdb.firebaseio.com",
+      projectId: "dishify-menu",
+      storageBucket: "dishify-menu.firebasestorage.app",
+      messagingSenderId: "182873179650",
+      appId: "1:182873179650:web:8ff8cf3c04789d9f7b091b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ── AUTH ──
+    function login() {
+      const val = document.getElementById('pwd-input').value;
+      if (val === ADMIN_PASSWORD) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('admin-app').style.display = 'block';
+        sessionStorage.setItem('dishify_auth','1');
+        initAdmin();
+      } else {
+        document.getElementById('login-err').style.display = 'block';
+        document.getElementById('pwd-input').value = '';
+        document.getElementById('pwd-input').focus();
+      }
+    }
+    function logout() { sessionStorage.removeItem('dishify_auth'); location.reload(); }
+    if (sessionStorage.getItem('dishify_auth') === '1') {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('admin-app').style.display = 'block';
+      initAdmin();
+    }
+
+    // ── PANELS ──
+    function showPanel(id, el) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('panel-' + id).classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    // ── DATA ──
+    let allRestaurants = {};
+    let allMenuItems = {};
+
+    function initAdmin() {
+      db.ref('restaurants').on('value', snap => {
+        allRestaurants = snap.val() || {};
+        allMenuItems = {};
+        Object.keys(allRestaurants).forEach(k => {
+          if (allRestaurants[k].menu) allMenuItems[k] = allRestaurants[k].menu;
+        });
+        updateAllUI();
+      });
+    }
+
+    function updateAllUI() {
+      // Stats
+      const rCount = Object.keys(allRestaurants).length;
+      let iCount = 0, arCount = 0;
+      Object.values(allRestaurants).forEach(r => {
+        if (r.menu) Object.values(r.menu).forEach(item => { iCount++; if (item.model) arCount++; });
+      });
+      document.getElementById('stat-restaurants').textContent = rCount;
+      document.getElementById('stat-items').textContent = iCount;
+      document.getElementById('stat-ar').textContent = arCount;
+
+      // Seed banner
+      document.getElementById('seed-banner').style.display = rCount > 0 ? 'none' : 'flex';
+
+      // Restaurant table
+      const tbody = document.getElementById('rest-list-body');
+      const keys = Object.keys(allRestaurants);
+      if (!keys.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No restaurants yet</td></tr>'; }
+      else {
+        tbody.innerHTML = keys.map(key => {
+          const r = allRestaurants[key];
+          const mc = r.menu ? Object.keys(r.menu).length : 0;
+          return `<tr>
+            <td><strong style="color:var(--cream)">${r.emoji||''} ${r.name}</strong></td>
+            <td>${r.cuisine||'—'}</td>
+            <td>${mc} items</td>
+            <td><button class="btn btn-red" onclick="deleteRestaurant('${key}','${r.name}')">Delete</button></td>
+          </tr>`;
+        }).join('');
+      }
+
+      // Dropdowns
+      const opts = '<option value="">Select restaurant…</option>' + keys.map(k => `<option value="${k}">${allRestaurants[k].name}</option>`).join('');
+      ['menu-rest','qr-restaurant','menu-filter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { const prev = el.value; el.innerHTML = opts; if (prev) el.value = prev; }
+      });
+
+      filterMenu();
+    }
+
+    function filterMenu() {
+      const rid = document.getElementById('menu-filter')?.value;
+      const tbody = document.getElementById('menu-list-body');
+      if (!rid) { tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Select a restaurant above</td></tr>'; return; }
+      const r = allRestaurants[rid];
+      const menu = r?.menu ? Object.entries(r.menu) : [];
+      if (!menu.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No items yet</td></tr>'; return; }
+      tbody.innerHTML = menu.map(([key, item]) => `
+        <tr>
+          <td><span style="margin-right:8px">${item.emoji||''}</span><strong style="color:var(--cream)">${item.name}</strong></td>
+          <td>${item.category||'—'}</td>
+          <td style="color:var(--gold)">PKR ${Number(item.price).toLocaleString()}</td>
+          <td>${item.model ? '<span style="color:var(--green);font-size:0.75rem">✦ AR</span>' : '—'}</td>
+          <td><button class="btn btn-red" onclick="deleteMenuItem('${rid}','${key}')">Remove</button></td>
+        </tr>`).join('');
+    }
+
+    // ── ACTIONS ──
+    function addRestaurant() {
+      const name = document.getElementById('rest-name').value.trim();
+      if (!name) { showToast('Please enter a restaurant name'); return; }
+      db.ref('restaurants').push({
+        name,
+        emoji: document.getElementById('rest-emoji').value || '🍽️',
+        cuisine: document.getElementById('rest-cuisine').value,
+        description: document.getElementById('rest-desc').value
+      }).then(() => {
+        ['rest-name','rest-emoji','rest-desc'].forEach(id => document.getElementById(id).value='');
+        showToast('✓ Restaurant added');
+      });
+    }
+
+    function deleteRestaurant(key, name) {
+      if (!confirm(`Delete "${name}" and all its menu items?`)) return;
+      db.ref('restaurants/' + key).remove().then(() => showToast('Restaurant deleted'));
+    }
+
+    function addMenuItem() {
+      const rid = document.getElementById('menu-rest').value;
+      if (!rid) { showToast('Select a restaurant first'); return; }
+      const name = document.getElementById('item-name').value.trim();
+      if (!name) { showToast('Enter an item name'); return; }
+      const model = document.getElementById('item-model').value.trim();
+      db.ref(`restaurants/${rid}/menu`).push({
+        name,
+        category: document.getElementById('item-cat').value || 'Mains',
+        price: parseInt(document.getElementById('item-price').value) || 0,
+        emoji: document.getElementById('item-emoji').value || '🍽️',
+        desc: document.getElementById('item-desc').value,
+        model,
+        hasAR: !!model,
+        spicy: document.getElementById('item-spicy').checked,
+        vegetarian: document.getElementById('item-veg').checked
+      }).then(() => {
+        ['item-name','item-cat','item-price','item-emoji','item-model','item-desc'].forEach(id => document.getElementById(id).value='');
+        document.getElementById('item-spicy').checked = false;
+        document.getElementById('item-veg').checked = false;
+        showToast('✓ Item added to menu');
+      });
+    }
+
+    function deleteMenuItem(rid, key) {
+      if (!confirm('Remove this menu item?')) return;
+      db.ref(`restaurants/${rid}/menu/${key}`).remove().then(() => showToast('Item removed'));
+    }
+
+    // ── QR ──
+    function generateQR() {
+      const rid = document.getElementById('qr-restaurant').value;
+      const box = document.getElementById('qrcode');
+      const urlEl = document.getElementById('qr-url');
+      box.innerHTML = '';
+      if (!rid) { urlEl.style.display='none'; return; }
+      const base = window.location.href.replace('admin.html','menu.html');
+      const url = base + '?r=' + rid;
+      new QRCode(box, { text: url, width: 200, height: 200, colorDark:'#0e0d0a', colorLight:'#ffffff' });
+      urlEl.textContent = url;
+      urlEl.style.display = 'block';
+    }
+
+    function downloadQR() {
+      const img = document.querySelector('#qrcode img');
+      const canvas = document.querySelector('#qrcode canvas');
+      if (canvas) {
+        const link = document.createElement('a');
+        link.download = 'dishify-qr.png';
+        link.href = canvas.toDataURL();
+        link.click();
+      } else if (img) {
+        const link = document.createElement('a');
+        link.download = 'dishify-qr.png';
+        link.href = img.src;
+        link.click();
+      }
+    }
+
+    function copyQRUrl() {
+      const url = document.getElementById('qr-url').textContent;
+      if (url) { navigator.clipboard.writeText(url).then(() => showToast('URL copied!')); }
+    }
+
+    // ── SEED ──
+    async function seedDatabase() {
+      showToast('Seeding sample data…');
+      const rKey = db.ref('restaurants').push().key;
+
+      // Real food .glb models from poly.pizza (free, public CDN)
+      const sampleMenu = {
+        [db.ref().push().key]: { name:'Margherita Pizza', category:'Mains', price:950, emoji:'🍕', desc:'San Marzano tomatoes, fresh mozzarella, basil, extra virgin olive oil on a hand-stretched crust.', model:'https://uploads.poly.pizza/m/d03fKqPIFQ/2.glb', hasAR:true, spicy:false, vegetarian:true },
+        [db.ref().push().key]: { name:'Classic Burger', category:'Mains', price:850, emoji:'🍔', desc:'Juicy beef patty with aged cheddar, crispy lettuce, vine tomato, pickles and our secret sauce.', model:'https://uploads.poly.pizza/m/5yFm4LPBTW/3.glb', hasAR:true, spicy:false, vegetarian:false },
+        [db.ref().push().key]: { name:'Truffle Pasta', category:'Mains', price:1200, emoji:'🍝', desc:'Fresh tagliatelle with black truffle, aged parmesan and a velvety cream sauce.', model:'https://uploads.poly.pizza/m/bHlAjqP3AI/2.glb', hasAR:true, spicy:false, vegetarian:true },
+        [db.ref().push().key]: { name:'Burrata Salad', category:'Starters', price:750, emoji:'🥗', desc:'Creamy burrata on a bed of heirloom tomatoes, rocket, balsamic reduction.', model:'', hasAR:false, spicy:false, vegetarian:true },
+        [db.ref().push().key]: { name:'Beef Tenderloin', category:'Mains', price:2800, emoji:'🥩', desc:'200g prime beef tenderloin, truffle jus, seasonal vegetables, pomme purée.', model:'https://uploads.poly.pizza/m/cRbbYnYQfJ/2.glb', hasAR:true, spicy:false, vegetarian:false },
+        [db.ref().push().key]: { name:'Lobster Bisque', category:'Starters', price:1100, emoji:'🦞', desc:'Velvety bisque of Atlantic lobster with cognac, tarragon crème fraîche.', model:'', hasAR:false, spicy:false, vegetarian:false },
+        [db.ref().push().key]: { name:'Tiramisu', category:'Desserts', price:650, emoji:'🍰', desc:'Classic Italian tiramisu with mascarpone, espresso-soaked ladyfingers, cocoa dust.', model:'', hasAR:false, spicy:false, vegetarian:true },
+        [db.ref().push().key]: { name:'Spicy Arrabbiata', category:'Mains', price:880, emoji:'🌶️', desc:'Penne in a fiery tomato sauce with garlic, red chillies, fresh herbs.', model:'', hasAR:false, spicy:true, vegetarian:true },
+      };
+
+      await db.ref(`restaurants/${rKey}`).set({
+        name: 'Casa Bella',
+        emoji: '🍕',
+        cuisine: 'Italian',
+        description: 'Authentic Italian dining crafted with passion, the finest imported ingredients and AR-powered presentation.',
+        menu: sampleMenu
+      });
+      showToast('✓ Sample restaurant "Casa Bella" created!');
+    }
+
+    // ── TOAST ──
+    function showToast(msg) {
+      const old = document.querySelector('.toast');
+      if (old) old.remove();
+      const t = document.createElement('div');
+      t.className='toast'; t.textContent=msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+  </script>
+</body>
+</html>
