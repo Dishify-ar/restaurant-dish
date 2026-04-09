@@ -9,137 +9,194 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <style>
-    :root {
-      --gold: #c9a84c;
-      --gold-light: #e8c97a;
-      --gold-dim: rgba(201,168,76,0.15);
-      --ink: #070604;
-      --ink2: #0e0d0a;
-      --ink3: #1a1815;
-      --cream: #f0e8d5;
-      --cream-dim: rgba(240,232,213,0.6);
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body { background: var(--ink); color: var(--cream); font-family: 'Outfit', sans-serif; overflow-x: hidden; cursor: none; }
+    :root { --gold:#c9a84c; --gold-light:#e8c97a; --gold-dim:rgba(201,168,76,0.15); --ink:#070604; --ink2:#0e0d0a; --ink3:#1a1815; --cream:#f0e8d5; --cream-dim:rgba(240,232,213,0.6); }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--ink);color:var(--cream);font-family:'Outfit',sans-serif;overflow-x:hidden;cursor:none}
+    .cursor{width:10px;height:10px;background:var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:transform .1s}
+    .cursor-ring{width:38px;height:38px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.5;transition:all .12s ease}
+    body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1;opacity:.35}
 
-    .cursor { width: 10px; height: 10px; background: var(--gold); border-radius: 50%; position: fixed; top:0;left:0; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); mix-blend-mode:difference; transition: transform 0.1s; }
-    .cursor-ring { width: 38px; height: 38px; border: 1px solid var(--gold); border-radius: 50%; position: fixed; top:0;left:0; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:0.5; transition: all 0.12s ease; }
-
-    body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:1; opacity:0.35; }
+    /* PIN GATE */
+    #pin-gate{position:fixed;inset:0;z-index:5000;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0}
+    .pin-box{text-align:center;padding:60px 50px;background:var(--ink2);border:1px solid #2a2520;border-radius:8px;width:420px;max-width:92vw}
+    .pin-logo{font-family:'Cormorant Garamond',serif;font-size:3rem;font-weight:300;color:var(--gold);letter-spacing:.1em;margin-bottom:6px}
+    .pin-sub{font-size:.7rem;letter-spacing:.4em;text-transform:uppercase;color:var(--cream-dim);margin-bottom:40px}
+    .pin-dots{display:flex;gap:14px;justify-content:center;margin-bottom:32px}
+    .pin-dot{width:14px;height:14px;border-radius:50%;border:1px solid #3a3020;background:transparent;transition:all .2s}
+    .pin-dot.filled{background:var(--gold);border-color:var(--gold)}
+    .pin-dot.shake{animation:shakeDot .4s ease}
+    @keyframes shakeDot{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+    .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:220px;margin:0 auto}
+    .pin-key{padding:16px;background:#13110d;border:1px solid #2a2520;border-radius:6px;color:var(--cream);font-family:'Outfit',sans-serif;font-size:1.2rem;font-weight:400;cursor:pointer;transition:all .2s;user-select:none}
+    .pin-key:hover{background:#1f1c15;border-color:var(--gold);color:var(--gold)}
+    .pin-key:active{transform:scale(.95)}
+    .pin-key.del{color:var(--cream-dim);font-size:.9rem}
+    .pin-err{color:#bf4040;font-size:.8rem;margin-top:14px;height:20px;transition:opacity .3s}
 
     /* HERO */
-    .hero { height: 100vh; position: relative; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-    .hero-bg { position:absolute; inset:0; background: linear-gradient(to bottom, rgba(7,6,4,0.25) 0%, rgba(7,6,4,0.65) 60%, var(--ink) 100%), url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1800&q=80') center/cover; transform:scale(1.06); animation: zoomBg 18s ease-in-out infinite alternate; }
-    @keyframes zoomBg { from{transform:scale(1.06)} to{transform:scale(1.13)} }
-    .hero-content { position:relative; z-index:2; text-align:center; }
-    .hero-eyebrow { font-size:0.72rem; letter-spacing:0.45em; color:var(--gold); text-transform:uppercase; font-weight:500; margin-bottom:22px; opacity:0; animation:fadeUp 1s 0.3s forwards; }
-    .hero-title { font-family:'Cormorant Garamond',serif; font-size:clamp(5rem,13vw,12rem); font-weight:300; line-height:0.87; color:var(--cream); letter-spacing:-0.02em; opacity:0; animation:fadeUp 1s 0.5s forwards; }
-    .hero-title em { color:var(--gold); font-style:italic; }
-    .hero-sub { font-size:1rem; font-weight:300; color:var(--cream-dim); margin-top:26px; letter-spacing:0.04em; opacity:0; animation:fadeUp 1s 0.7s forwards; }
-    .hero-cta { display:inline-flex; align-items:center; gap:10px; margin-top:48px; padding:16px 36px; background:var(--gold); color:var(--ink); font-weight:600; font-size:0.82rem; letter-spacing:0.15em; text-transform:uppercase; text-decoration:none; border-radius:2px; opacity:0; animation:fadeUp 1s 0.9s forwards; transition:all 0.3s; }
-    .hero-cta:hover { background:var(--gold-light); transform:translateY(-2px); box-shadow:0 20px 60px rgba(201,168,76,0.3); }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
-
-    .scroll-hint { position:absolute; bottom:38px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--cream-dim); font-size:0.68rem; letter-spacing:0.35em; text-transform:uppercase; animation:bounce 2s ease-in-out infinite; }
-    .scroll-hint::after { content:''; width:1px; height:48px; background:linear-gradient(to bottom, var(--gold), transparent); }
-    @keyframes bounce { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(8px)} }
+    .hero{height:100vh;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .hero-bg{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(7,6,4,.25) 0%,rgba(7,6,4,.65) 60%,var(--ink) 100%),url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1800&q=80') center/cover;transform:scale(1.06);animation:zoomBg 18s ease-in-out infinite alternate}
+    @keyframes zoomBg{from{transform:scale(1.06)}to{transform:scale(1.13)}}
+    .hero-content{position:relative;z-index:2;text-align:center}
+    .hero-eyebrow{font-size:.72rem;letter-spacing:.45em;color:var(--gold);text-transform:uppercase;font-weight:500;margin-bottom:22px;opacity:0;animation:fadeUp 1s .3s forwards}
+    .hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(5rem,13vw,12rem);font-weight:300;line-height:.87;color:var(--cream);letter-spacing:-.02em;opacity:0;animation:fadeUp 1s .5s forwards}
+    .hero-title em{color:var(--gold);font-style:italic}
+    .hero-sub{font-size:1rem;font-weight:300;color:var(--cream-dim);margin-top:26px;letter-spacing:.04em;opacity:0;animation:fadeUp 1s .7s forwards}
+    .hero-cta{display:inline-flex;align-items:center;gap:10px;margin-top:48px;padding:16px 36px;background:var(--gold);color:var(--ink);font-weight:600;font-size:.82rem;letter-spacing:.15em;text-transform:uppercase;text-decoration:none;border-radius:2px;opacity:0;animation:fadeUp 1s .9s forwards;transition:all .3s}
+    .hero-cta:hover{background:var(--gold-light);transform:translateY(-2px);box-shadow:0 20px 60px rgba(201,168,76,.3)}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+    .scroll-hint{position:absolute;bottom:38px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--cream-dim);font-size:.68rem;letter-spacing:.35em;text-transform:uppercase;animation:bounce 2s ease-in-out infinite}
+    .scroll-hint::after{content:'';width:1px;height:48px;background:linear-gradient(to bottom,var(--gold),transparent)}
+    @keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
 
     /* FEATURES */
-    .features { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#222018; border-top:1px solid #222018; border-bottom:1px solid #222018; }
-    .feature { background:var(--ink2); padding:50px 40px; text-align:center; transition:background 0.3s; }
-    .feature:hover { background:var(--ink3); }
-    .feature-icon { font-size:2.4rem; margin-bottom:18px; display:block; }
-    .feature h3 { font-family:'Cormorant Garamond',serif; font-size:1.35rem; font-weight:400; color:var(--gold); margin-bottom:10px; }
-    .feature p { font-size:0.85rem; color:var(--cream-dim); line-height:1.75; }
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#222018;border-top:1px solid #222018;border-bottom:1px solid #222018}
+    .feature{background:var(--ink2);padding:50px 40px;text-align:center;transition:background .3s}
+    .feature:hover{background:var(--ink3)}
+    .feature-icon{font-size:2.4rem;margin-bottom:18px;display:block}
+    .feature h3{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:400;color:var(--gold);margin-bottom:10px}
+    .feature p{font-size:.85rem;color:var(--cream-dim);line-height:1.75}
 
     /* RESTAURANTS */
-    .restaurants-section { padding:120px 60px; max-width:1400px; margin:0 auto; }
-    .section-label { font-size:0.68rem; letter-spacing:0.5em; text-transform:uppercase; color:var(--gold); margin-bottom:14px; font-weight:500; }
-    .section-title { font-family:'Cormorant Garamond',serif; font-size:clamp(2.5rem,5vw,4rem); font-weight:300; color:var(--cream); margin-bottom:56px; line-height:1.1; }
-    .section-title em { color:var(--gold); font-style:italic; }
-
-    .restaurant-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:22px; }
-    .restaurant-card { position:relative; background:var(--ink2); border:1px solid #2a2520; border-radius:4px; overflow:hidden; cursor:pointer; transition:all 0.4s cubic-bezier(0.16,1,0.3,1); text-decoration:none; display:block; }
-    .restaurant-card:hover { border-color:var(--gold); transform:translateY(-6px); box-shadow:0 30px 80px rgba(0,0,0,0.5),0 0 0 1px var(--gold-dim); }
-    .card-img { height:200px; overflow:hidden; position:relative; }
-    .card-img img { width:100%; height:100%; object-fit:cover; transition:transform 0.6s ease; filter:brightness(0.75) saturate(0.85); }
-    .restaurant-card:hover .card-img img { transform:scale(1.08); filter:brightness(0.9) saturate(1); }
-    .card-emoji { position:absolute; bottom:16px; right:16px; font-size:2.5rem; filter:drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
-    .card-body { padding:26px 26px 50px; }
-    .card-tag { display:inline-block; font-size:0.62rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--gold); border:1px solid var(--gold-dim); padding:4px 12px; border-radius:2px; margin-bottom:10px; }
-    .card-name { font-family:'Cormorant Garamond',serif; font-size:1.55rem; font-weight:400; color:var(--cream); margin-bottom:6px; line-height:1.2; }
-    .card-desc { font-size:0.82rem; color:var(--cream-dim); line-height:1.65; }
-    .card-arrow { position:absolute; bottom:22px; right:22px; width:34px; height:34px; border-radius:50%; border:1px solid #3a3530; display:flex; align-items:center; justify-content:center; color:var(--gold); font-size:0.85rem; transition:all 0.3s; }
-    .restaurant-card:hover .card-arrow { background:var(--gold); color:var(--ink); border-color:var(--gold); }
-
-    .empty-state { grid-column:1/-1; text-align:center; padding:80px 40px; color:var(--cream-dim); }
-    .empty-state h3 { font-family:'Cormorant Garamond',serif; font-size:2rem; color:var(--gold); margin-bottom:10px; }
-
-    .skel { background:linear-gradient(90deg,#1a1815 25%,#252018 50%,#1a1815 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:3px; }
-    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-    footer { border-top:1px solid #2a2520; padding:48px 60px; display:flex; align-items:center; justify-content:space-between; background:var(--ink2); }
-    .footer-logo { font-family:'Cormorant Garamond',serif; font-size:1.9rem; font-weight:300; color:var(--gold); letter-spacing:0.1em; }
-    .footer-links { display:flex; gap:28px; }
-    .footer-links a { color:var(--cream-dim); text-decoration:none; font-size:0.78rem; letter-spacing:0.08em; transition:color 0.2s; }
-    .footer-links a:hover { color:var(--gold); }
-
-    @media(max-width:768px) {
-      .features{grid-template-columns:1fr}
-      .restaurants-section{padding:60px 20px}
-      footer{flex-direction:column;gap:20px;text-align:center}
-      .hero-title{font-size:4.5rem}
-    }
+    .restaurants-section{padding:120px 60px;max-width:1400px;margin:0 auto}
+    .section-label{font-size:.68rem;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);margin-bottom:14px;font-weight:500}
+    .section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--cream);margin-bottom:56px;line-height:1.1}
+    .section-title em{color:var(--gold);font-style:italic}
+    .restaurant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px}
+    .restaurant-card{position:relative;background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden;cursor:pointer;transition:all .4s cubic-bezier(.16,1,.3,1);text-decoration:none;display:block}
+    .restaurant-card:hover{border-color:var(--gold);transform:translateY(-6px);box-shadow:0 30px 80px rgba(0,0,0,.5),0 0 0 1px var(--gold-dim)}
+    .card-img{height:200px;overflow:hidden;position:relative}
+    .card-img img{width:100%;height:100%;object-fit:cover;transition:transform .6s ease;filter:brightness(.75) saturate(.85)}
+    .restaurant-card:hover .card-img img{transform:scale(1.08);filter:brightness(.9) saturate(1)}
+    .card-emoji{position:absolute;bottom:16px;right:16px;font-size:2.5rem;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+    .card-body{padding:26px 26px 50px}
+    .card-tag{display:inline-block;font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold-dim);padding:4px 12px;border-radius:2px;margin-bottom:10px}
+    .card-name{font-family:'Cormorant Garamond',serif;font-size:1.55rem;font-weight:400;color:var(--cream);margin-bottom:6px;line-height:1.2}
+    .card-desc{font-size:.82rem;color:var(--cream-dim);line-height:1.65}
+    .card-arrow{position:absolute;bottom:22px;right:22px;width:34px;height:34px;border-radius:50%;border:1px solid #3a3530;display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:.85rem;transition:all .3s}
+    .restaurant-card:hover .card-arrow{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+    .empty-state{grid-column:1/-1;text-align:center;padding:80px 40px;color:var(--cream-dim)}
+    .empty-state h3{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--gold);margin-bottom:10px}
+    .skel{background:linear-gradient(90deg,#1a1815 25%,#252018 50%,#1a1815 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:3px}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    footer{border-top:1px solid #2a2520;padding:48px 60px;display:flex;align-items:center;justify-content:space-between;background:var(--ink2)}
+    .footer-logo{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:300;color:var(--gold);letter-spacing:.1em}
+    .footer-links{display:flex;gap:28px}
+    .footer-links a{color:var(--cream-dim);text-decoration:none;font-size:.78rem;letter-spacing:.08em;transition:color .2s}
+    .footer-links a:hover{color:var(--gold)}
+    @media(max-width:768px){.features{grid-template-columns:1fr}.restaurants-section{padding:60px 20px}footer{flex-direction:column;gap:20px;text-align:center}.hero-title{font-size:4.5rem}}
   </style>
 </head>
 <body>
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
 
-  <section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-content">
-      <div class="hero-eyebrow">✦ Premium Digital Dining Experience</div>
-      <h1 class="hero-title">DISH<em>IFY</em></h1>
-      <p class="hero-sub">Scan. Explore. Experience food in augmented reality.</p>
-      <a href="#restaurants" class="hero-cta">Explore Restaurants ↓</a>
+  <!-- PIN GATE -->
+  <div id="pin-gate">
+    <div class="pin-box">
+      <div class="pin-logo">DISHIFY</div>
+      <div class="pin-sub">Owner Access</div>
+      <div class="pin-dots">
+        <div class="pin-dot" id="d0"></div>
+        <div class="pin-dot" id="d1"></div>
+        <div class="pin-dot" id="d2"></div>
+        <div class="pin-dot" id="d3"></div>
+      </div>
+      <div class="pin-pad">
+        <button class="pin-key" onclick="pinPress('1')">1</button>
+        <button class="pin-key" onclick="pinPress('2')">2</button>
+        <button class="pin-key" onclick="pinPress('3')">3</button>
+        <button class="pin-key" onclick="pinPress('4')">4</button>
+        <button class="pin-key" onclick="pinPress('5')">5</button>
+        <button class="pin-key" onclick="pinPress('6')">6</button>
+        <button class="pin-key" onclick="pinPress('7')">7</button>
+        <button class="pin-key" onclick="pinPress('8')">8</button>
+        <button class="pin-key" onclick="pinPress('9')">9</button>
+        <button class="pin-key" onclick="pinClear()">C</button>
+        <button class="pin-key" onclick="pinPress('0')">0</button>
+        <button class="pin-key del" onclick="pinDelete()">⌫</button>
+      </div>
+      <div class="pin-err" id="pin-err"></div>
     </div>
-    <div class="scroll-hint">scroll</div>
-  </section>
-
-  <div class="features">
-    <div class="feature"><span class="feature-icon">🥽</span><h3>Augmented Reality</h3><p>See every dish in stunning 3D before you order. Place it on your table with your camera.</p></div>
-    <div class="feature"><span class="feature-icon">⚡</span><h3>Instant QR Menus</h3><p>No app required. Scan, browse and order instantly from your table.</p></div>
-    <div class="feature"><span class="feature-icon">✦</span><h3>Luxury Experience</h3><p>Crafted for fine dining. Every detail, from typography to animation, speaks elegance.</p></div>
   </div>
 
-  <section class="restaurants-section" id="restaurants">
-    <div class="section-label">✦ Participating Venues</div>
-    <h2 class="section-title">Select Your <em>Restaurant</em></h2>
-    <div class="restaurant-grid" id="restaurants-list">
-      <div style="background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden;"><div class="skel" style="height:200px"></div><div style="padding:26px"><div class="skel" style="height:12px;width:60px;margin-bottom:10px"></div><div class="skel" style="height:22px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:90%"></div></div></div>
-      <div style="background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden;"><div class="skel" style="height:200px"></div><div style="padding:26px"><div class="skel" style="height:12px;width:60px;margin-bottom:10px"></div><div class="skel" style="height:22px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:90%"></div></div></div>
+  <!-- MAIN CONTENT (hidden until PIN) -->
+  <div id="main-content" style="display:none">
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <div class="hero-eyebrow">✦ Premium Digital Dining Experience</div>
+        <h1 class="hero-title">DISH<em>IFY</em></h1>
+        <p class="hero-sub">Scan. Explore. Experience food in augmented reality.</p>
+        <a href="#restaurants" class="hero-cta">Explore Restaurants ↓</a>
+      </div>
+      <div class="scroll-hint">scroll</div>
+    </section>
+    <div class="features">
+      <div class="feature"><span class="feature-icon">🥽</span><h3>Augmented Reality</h3><p>See every dish in stunning 3D before you order. Place it on your table with your camera.</p></div>
+      <div class="feature"><span class="feature-icon">⚡</span><h3>Instant QR Menus</h3><p>No app required. Scan, browse and order instantly from your table.</p></div>
+      <div class="feature"><span class="feature-icon">✦</span><h3>Luxury Experience</h3><p>Crafted for fine dining. Every detail, from typography to animation, speaks elegance.</p></div>
     </div>
-  </section>
-
-  <footer>
-    <div class="footer-logo">DISHIFY</div>
-    <div class="footer-links">
-      <a href="#restaurants">Restaurants</a>
-      <a href="admin.html">Admin</a>
-    </div>
-  </footer>
+    <section class="restaurants-section" id="restaurants">
+      <div class="section-label">✦ Participating Venues</div>
+      <h2 class="section-title">Select Your <em>Restaurant</em></h2>
+      <div class="restaurant-grid" id="restaurants-list">
+        <div style="background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden;"><div class="skel" style="height:200px"></div><div style="padding:26px"><div class="skel" style="height:12px;width:60px;margin-bottom:10px"></div><div class="skel" style="height:22px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:90%"></div></div></div>
+        <div style="background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden;"><div class="skel" style="height:200px"></div><div style="padding:26px"><div class="skel" style="height:12px;width:60px;margin-bottom:10px"></div><div class="skel" style="height:22px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:90%"></div></div></div>
+      </div>
+    </section>
+    <footer>
+      <div class="footer-logo">DISHIFY</div>
+      <div class="footer-links">
+        <a href="#restaurants">Restaurants</a>
+        <a href="owner.html">Orders</a>
+        <a href="admin.html">Admin</a>
+      </div>
+    </footer>
+  </div>
 
   <script>
+    // ── PIN CONFIG — change this to your own 4-digit PIN ──
+    const OWNER_PIN = 'Fifa2k23$';
+
+    let pinEntry = '';
+
+    function pinPress(digit) {
+      if (pinEntry.length >= 4) return;
+      pinEntry += digit;
+      updateDots();
+      if (pinEntry.length === 4) setTimeout(checkPin, 200);
+    }
+    function pinDelete() { pinEntry = pinEntry.slice(0,-1); updateDots(); }
+    function pinClear() { pinEntry = ''; updateDots(); }
+    function updateDots() {
+      for (let i=0;i<4;i++) document.getElementById('d'+i).classList.toggle('filled', i < pinEntry.length);
+    }
+    function checkPin() {
+      if (pinEntry === OWNER_PIN) {
+        sessionStorage.setItem('dishify_owner','1');
+        document.getElementById('pin-gate').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        loadRestaurants();
+      } else {
+        document.querySelectorAll('.pin-dot').forEach(d => { d.classList.add('shake'); setTimeout(()=>d.classList.remove('shake'),400); });
+        document.getElementById('pin-err').textContent = 'Incorrect PIN. Try again.';
+        setTimeout(() => { pinEntry=''; updateDots(); document.getElementById('pin-err').textContent=''; }, 800);
+      }
+    }
+    // Auto-unlock if already authenticated this session
+    if (sessionStorage.getItem('dishify_owner')==='1') {
+      document.getElementById('pin-gate').style.display='none';
+      document.getElementById('main-content').style.display='block';
+    }
+
+    // Firebase
     const firebaseConfig = {
-      apiKey: "AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",
-      authDomain: "dishify-menu.firebaseapp.com",
-      databaseURL: "https://dishify-menu-default-rtdb.firebaseio.com",
-      projectId: "dishify-menu",
-      storageBucket: "dishify-menu.firebasestorage.app",
-      messagingSenderId: "182873179650",
-      appId: "1:182873179650:web:8ff8cf3c04789d9f7b091b"
+      apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",
+      databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",
+      storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",
+      appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"
     };
     firebase.initializeApp(firebaseConfig);
 
@@ -153,35 +210,30 @@
       'default':'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80'
     };
 
-    firebase.database().ref('restaurants').on('value', snap => {
-      const data = snap.val() || {};
-      const keys = Object.keys(data);
-      const list = document.getElementById('restaurants-list');
-      if (!keys.length) {
-        list.innerHTML = `<div class="empty-state"><h3>Coming Soon</h3><p>Our restaurant partners are being onboarded. Check back shortly.</p></div>`;
-        return;
-      }
-      list.innerHTML = keys.map(key => {
-        const r = data[key];
-        const img = cuisineImages[r.cuisine] || cuisineImages['default'];
-        return `<a class="restaurant-card" href="menu.html?r=${key}">
-          <div class="card-img"><img src="${img}" alt="${r.name}" loading="lazy"><div class="card-emoji">${r.emoji||'🍽️'}</div></div>
-          <div class="card-body">
-            <span class="card-tag">${r.cuisine||'Fine Dining'}</span>
-            <h3 class="card-name">${r.name}</h3>
-            <p class="card-desc">${r.description||'Exceptional cuisine crafted with passion and the finest ingredients.'}</p>
-          </div>
-          <div class="card-arrow">→</div>
-        </a>`;
-      }).join('');
-    });
+    function loadRestaurants() {
+      firebase.database().ref('restaurants').on('value', snap => {
+        const data = snap.val()||{};
+        const keys = Object.keys(data);
+        const list = document.getElementById('restaurants-list');
+        if (!keys.length) { list.innerHTML=`<div class="empty-state"><h3>Coming Soon</h3><p>No restaurants yet.</p></div>`; return; }
+        list.innerHTML = keys.map(key => {
+          const r=data[key], img=cuisineImages[r.cuisine]||cuisineImages['default'];
+          return `<a class="restaurant-card" href="menu.html?r=${key}">
+            <div class="card-img"><img src="${img}" alt="${r.name}" loading="lazy"><div class="card-emoji">${r.emoji||'🍽️'}</div></div>
+            <div class="card-body"><span class="card-tag">${r.cuisine||'Fine Dining'}</span><h3 class="card-name">${r.name}</h3><p class="card-desc">${r.description||'Exceptional cuisine crafted with passion.'}</p></div>
+            <div class="card-arrow">→</div>
+          </a>`;
+        }).join('');
+      });
+    }
 
-    // Custom cursor
-    const cursor = document.getElementById('cursor');
-    const ring = document.getElementById('cursorRing');
+    if (sessionStorage.getItem('dishify_owner')==='1') loadRestaurants();
+
+    // Cursor
+    const cursor=document.getElementById('cursor'), ring=document.getElementById('cursorRing');
     document.addEventListener('mousemove', e => {
-      cursor.style.left = e.clientX+'px'; cursor.style.top = e.clientY+'px';
-      setTimeout(() => { ring.style.left = e.clientX+'px'; ring.style.top = e.clientY+'px'; }, 80);
+      cursor.style.left=e.clientX+'px'; cursor.style.top=e.clientY+'px';
+      setTimeout(()=>{ring.style.left=e.clientX+'px';ring.style.top=e.clientY+'px';},80);
     });
   </script>
 </body>
