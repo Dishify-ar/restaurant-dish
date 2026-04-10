@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Orders — Dishify</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <style>
+    :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040;--amber:#e0a020}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--ink);color:var(--cream);font-family:'Outfit',sans-serif;min-height:100vh}
+
+    /* ── STEP 1: RESTAURANT SELECT ── */
+    #step-select{position:fixed;inset:0;z-index:1000;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:20px}
+    .select-box{background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:48px 44px;width:520px;max-width:96vw;text-align:center}
+    .select-logo{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;color:var(--gold);letter-spacing:.1em;margin-bottom:6px}
+    .select-sub{font-size:.68rem;letter-spacing:.4em;text-transform:uppercase;color:var(--cream-dim);margin-bottom:36px}
+    .rest-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px;max-height:50vh;overflow-y:auto}
+    .rest-pick-btn{background:#13110d;border:1px solid #3a3020;border-radius:6px;padding:16px 14px;cursor:pointer;text-align:left;transition:all .25s;display:flex;align-items:center;gap:12px}
+    .rest-pick-btn:hover{border-color:var(--gold);background:#1a1610}
+    .rest-pick-btn.selected{border-color:var(--gold);background:var(--gold-dim)}
+    .rest-pick-emoji{font-size:1.6rem;flex-shrink:0}
+    .rest-pick-name{font-size:.88rem;font-weight:500;color:var(--cream);line-height:1.2}
+    .rest-pick-cuisine{font-size:.68rem;color:var(--cream-dim);letter-spacing:.08em}
+    .select-next-btn{width:100%;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .3s;margin-top:8px}
+    .select-next-btn:hover{background:var(--gold-light)}
+    .select-next-btn:disabled{opacity:.4;cursor:not-allowed}
+    .select-loading{color:var(--cream-dim);font-size:.85rem;padding:20px 0}
+
+    /* ── STEP 2: PASSWORD ── */
+    #step-password{position:fixed;inset:0;z-index:1000;background:var(--ink);display:none;align-items:center;justify-content:center;padding:20px}
+    .login-box{background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:60px 50px;width:420px;max-width:90vw;text-align:center}
+    .login-logo{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;color:var(--gold);letter-spacing:.1em;margin-bottom:6px}
+    .login-sub{font-size:.68rem;letter-spacing:.4em;text-transform:uppercase;color:var(--cream-dim);margin-bottom:8px}
+    .login-rest-name{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--cream);margin-bottom:32px}
+    .login-label{display:block;text-align:left;font-size:.68rem;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+    .login-input{width:100%;padding:14px 18px;background:#13110d;border:1px solid #3a3020;color:var(--cream);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.95rem;margin-bottom:20px;transition:border-color .2s}
+    .login-input:focus{outline:none;border-color:var(--gold)}
+    .login-btn{width:100%;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .3s}
+    .login-btn:hover{background:var(--gold-light)}
+    .login-back{background:transparent;border:none;color:var(--cream-dim);font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;margin-top:14px;text-decoration:underline}
+    .login-back:hover{color:var(--gold)}
+    .login-err{color:var(--red);font-size:.82rem;margin-top:12px;height:20px}
+
+    /* ── APP ── */
+    #app{display:none}
+    header{background:var(--ink2);border-bottom:1px solid #2a2520;padding:0 40px;height:70px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+    .header-left{display:flex;align-items:center;gap:16px}
+    .header-logo{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:300;color:var(--gold);letter-spacing:.1em}
+    .header-rest{font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--cream-dim);padding:4px 12px;background:var(--gold-dim);border:1px solid rgba(201,168,76,.2);border-radius:2px}
+    .header-right{display:flex;align-items:center;gap:12px}
+    .live-badge{display:flex;align-items:center;gap:6px;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--green);padding:6px 14px;border:1px solid rgba(76,175,125,.3);border-radius:2px;background:rgba(76,175,125,.05)}
+    .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+    .icon-btn{padding:8px 16px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+    .icon-btn:hover{border-color:var(--gold);color:var(--gold)}
+    .logout-btn{padding:8px 18px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+    .logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+    main{padding:40px;max-width:1400px;margin:0 auto}
+    .page-title{font-family:'Cormorant Garamond',serif;font-size:2.4rem;font-weight:300;color:var(--cream);margin-bottom:4px}
+    .page-subtitle{font-size:.78rem;color:var(--cream-dim);letter-spacing:.05em;margin-bottom:32px}
+
+    /* TABS (for multiple restaurants admin view — shows all) */
+    .rest-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px}
+    .rest-tab{padding:10px 22px;background:var(--ink2);border:1px solid #2a2520;border-radius:3px;color:var(--cream-dim);font-size:.78rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:8px}
+    .rest-tab.active{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
+    .rest-tab .badge-new{background:var(--red);color:white;border-radius:50%;width:18px;height:18px;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:700}
+
+    /* STATS */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+    .stat{background:var(--ink2);border:1px solid #2a2520;border-radius:6px;padding:22px 24px}
+    .stat-val{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;color:var(--gold);line-height:1}
+    .stat-label{font-size:.65rem;letter-spacing:.3em;text-transform:uppercase;color:var(--cream-dim);margin-top:4px}
+
+    /* ORDERS */
+    .orders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+    .order-card{background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:24px;position:relative;transition:border-color .3s;animation:cardIn .4s cubic-bezier(.16,1,.3,1) both}
+    @keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .order-card.status-new{border-left:3px solid var(--gold)}
+    .order-card.status-preparing{border-left:3px solid var(--amber)}
+    .order-card.status-ready{border-left:3px solid var(--green)}
+    .order-card.status-done{border-left:3px solid #444;opacity:.6}
+    .order-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+    .order-id{font-size:.68rem;letter-spacing:.25em;text-transform:uppercase;color:var(--cream-dim)}
+    .order-table{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--cream);margin-top:2px}
+    .order-items-list{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #2a2520}
+    .order-line{display:flex;justify-content:space-between;font-size:.85rem;padding:5px 0}
+    .order-line-name{color:var(--cream)}
+    .order-line-qty{color:var(--cream-dim);font-size:.78rem}
+    .order-line-price{color:var(--gold);font-size:.85rem}
+    .order-total-row{display:flex;justify-content:space-between;margin-bottom:16px}
+    .order-total-row span:first-child{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cream-dim)}
+    .order-total-row span:last-child{font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--gold)}
+    .status-btns{display:flex;gap:8px;flex-wrap:wrap}
+    .status-btn{flex:1;padding:9px 12px;border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s;min-width:80px}
+    .btn-preparing{background:rgba(224,160,32,.15);border:1px solid rgba(224,160,32,.4);color:var(--amber)}
+    .btn-preparing:hover{background:rgba(224,160,32,.25)}
+    .btn-ready{background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.4);color:var(--green)}
+    .btn-ready:hover{background:rgba(76,175,125,.22)}
+    .btn-done{background:#1a1815;border:1px solid #333;color:#666}
+    .btn-done:hover{border-color:#555;color:#888}
+    .status-chip{display:inline-flex;align-items:center;gap:5px;font-size:.65rem;letter-spacing:.2em;text-transform:uppercase;padding:4px 10px;border-radius:2px}
+    .chip-new{color:var(--gold);background:var(--gold-dim);border:1px solid rgba(201,168,76,.25)}
+    .chip-preparing{color:var(--amber);background:rgba(224,160,32,.08);border:1px solid rgba(224,160,32,.25)}
+    .chip-ready{color:var(--green);background:rgba(76,175,125,.08);border:1px solid rgba(76,175,125,.25)}
+    .chip-done{color:#555;background:#111;border:1px solid #222}
+    .empty-orders{text-align:center;padding:80px 40px;color:var(--cream-dim)}
+    .empty-orders h3{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--gold);margin-bottom:8px}
+
+    /* PASSWORD CHANGE MODAL */
+    #pwd-modal{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center}
+    #pwd-modal.open{display:flex}
+    .pwd-modal-box{background:var(--ink2);border:1px solid var(--gold);border-radius:8px;padding:48px 40px;width:420px;max-width:90vw}
+    .pwd-modal-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--gold);margin-bottom:6px}
+    .pwd-modal-sub{font-size:.75rem;color:var(--cream-dim);margin-bottom:28px}
+    .pwd-form-label{display:block;font-size:.68rem;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+    .pwd-form-input{width:100%;padding:12px 16px;background:#13110d;border:1px solid #3a3020;color:var(--cream);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.9rem;margin-bottom:16px;transition:border-color .2s}
+    .pwd-form-input:focus{outline:none;border-color:var(--gold)}
+    .pwd-modal-btns{display:flex;gap:10px;margin-top:6px}
+    .btn-gold{padding:12px 24px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s;flex:1}
+    .btn-gold:hover{background:var(--gold-light)}
+    .btn-cancel{padding:12px 24px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+    .btn-cancel:hover{border-color:var(--red);color:var(--red)}
+    .pwd-err{color:var(--red);font-size:.8rem;margin-top:8px;height:18px}
+
+    .notif-toast{position:fixed;top:90px;right:24px;background:var(--ink3);border:1px solid var(--gold);border-left:3px solid var(--gold);color:var(--cream);padding:16px 20px;border-radius:4px;font-size:.85rem;z-index:900;animation:slideLeft .4s cubic-bezier(.16,1,.3,1);max-width:300px}
+    @keyframes slideLeft{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+    .toast{position:fixed;bottom:30px;right:24px;background:var(--ink3);border:1px solid var(--gold);color:var(--cream);padding:14px 20px;border-radius:4px;font-size:.85rem;z-index:900}
+
+    @media(max-width:900px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px){header{padding:0 16px}main{padding:20px}.stats-row{grid-template-columns:1fr 1fr}.orders-grid{grid-template-columns:1fr}.rest-grid{grid-template-columns:1fr}.header-right .icon-btn{display:none}}
+  </style>
+</head>
+<body>
+
+  <!-- STEP 1: SELECT RESTAURANT -->
+  <div id="step-select">
+    <div class="select-box">
+      <div class="select-logo">DISHIFY</div>
+      <div class="select-sub">Restaurant Owner Login</div>
+      <p style="font-size:.82rem;color:var(--cream-dim);margin-bottom:20px">Select your restaurant to continue:</p>
+      <div class="rest-grid" id="rest-pick-grid">
+        <div class="select-loading">Loading restaurants…</div>
+      </div>
+      <button class="select-next-btn" id="select-next-btn" disabled onclick="goToPassword()">Continue →</button>
+      <br>
+      <a href="index.html" style="display:inline-block;margin-top:16px;font-size:.75rem;color:var(--cream-dim);text-decoration:none">← Back to Home</a>
+    </div>
+  </div>
+
+  <!-- STEP 2: PASSWORD -->
+  <div id="step-password" style="display:none;align-items:center;justify-content:center;padding:20px">
+    <div class="login-box">
+      <div class="login-logo">DISHIFY</div>
+      <div class="login-sub">Authenticate</div>
+      <div class="login-rest-name" id="login-rest-name">Restaurant Name</div>
+      <label class="login-label">Owner Password</label>
+      <input class="login-input" type="password" id="pwd-input" placeholder="Enter your password" onkeydown="if(event.key==='Enter')login()">
+      <button class="login-btn" onclick="login()">View Orders</button>
+      <div class="login-err" id="login-err"></div>
+      <button class="login-back" onclick="goBack()">← Choose different restaurant</button>
+    </div>
+  </div>
+
+  <!-- PASSWORD CHANGE MODAL -->
+  <div id="pwd-modal">
+    <div class="pwd-modal-box">
+      <div class="pwd-modal-title">Change Password</div>
+      <div class="pwd-modal-sub">Update your restaurant's owner password.</div>
+      <label class="pwd-form-label">Current Password</label>
+      <input class="pwd-form-input" type="password" id="pwd-current" placeholder="Current password">
+      <label class="pwd-form-label">New Password</label>
+      <input class="pwd-form-input" type="password" id="pwd-new" placeholder="Min. 4 characters">
+      <label class="pwd-form-label">Confirm New Password</label>
+      <input class="pwd-form-input" type="password" id="pwd-confirm" placeholder="Repeat new password">
+      <div class="pwd-err" id="pwd-err"></div>
+      <div class="pwd-modal-btns">
+        <button class="btn-cancel" onclick="closePwdModal()">Cancel</button>
+        <button class="btn-gold" onclick="changePassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app">
+    <header>
+      <div class="header-left">
+        <div class="header-logo">DISHIFY</div>
+        <div class="header-rest" id="header-rest-name">Restaurant</div>
+      </div>
+      <div class="header-right">
+        <div class="live-badge"><div class="live-dot"></div>Live Orders</div>
+        <button class="icon-btn" onclick="openPwdModal()">🔑 Change Password</button>
+        <button class="logout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="page-title" id="page-title">Orders Dashboard</div>
+      <div class="page-subtitle" id="page-subtitle">Live orders for your restaurant</div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="stat-val" id="stat-new">0</div><div class="stat-label">New Orders</div></div>
+        <div class="stat"><div class="stat-val" id="stat-prep">0</div><div class="stat-label">Preparing</div></div>
+        <div class="stat"><div class="stat-val" id="stat-ready">0</div><div class="stat-label">Ready</div></div>
+        <div class="stat"><div class="stat-val" id="stat-today">0</div><div class="stat-label">Today Total</div></div>
+      </div>
+      <div class="stats-row" style="grid-template-columns:repeat(2,1fr)">
+        <div class="stat"><div class="stat-val" id="stat-revenue" style="font-size:1.8rem">PKR 0</div><div class="stat-label">Today's Revenue</div></div>
+        <div class="stat"><div class="stat-val" id="stat-avg" style="font-size:1.8rem">—</div><div class="stat-label">Avg. Order Value</div></div>
+      </div>
+
+      <div class="orders-grid" id="orders-grid">
+        <div class="empty-orders"><h3>Waiting for Orders</h3><p>Orders will appear here in real time.</p></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",
+      databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",
+      storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",
+      appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let allRestaurants = {};
+    let selectedRid = null;
+    let currentRestaurant = null;
+    let allOrders = {};
+    let knownOrderIds = new Set();
+    let initialized = false;
+
+    // ── LOAD RESTAURANTS INTO PICKER ──
+    db.ref('restaurants').once('value', snap => {
+      allRestaurants = snap.val() || {};
+      const keys = Object.keys(allRestaurants);
+      const grid = document.getElementById('rest-pick-grid');
+      if (!keys.length) {
+        grid.innerHTML = '<p style="color:var(--cream-dim);font-size:.85rem;grid-column:1/-1">No restaurants found. Contact admin.</p>';
+        return;
+      }
+      grid.innerHTML = keys.map(key => {
+        const r = allRestaurants[key];
+        return `<button class="rest-pick-btn" onclick="selectRest('${key}',this)">
+          <span class="rest-pick-emoji">${r.emoji||'🍽️'}</span>
+          <div>
+            <div class="rest-pick-name">${r.name}</div>
+            <div class="rest-pick-cuisine">${r.cuisine||'Restaurant'}</div>
+          </div>
+        </button>`;
+      }).join('');
+    });
+
+    function selectRest(rid, btn) {
+      document.querySelectorAll('.rest-pick-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedRid = rid;
+      document.getElementById('select-next-btn').disabled = false;
+    }
+
+    function goToPassword() {
+      if (!selectedRid) return;
+      currentRestaurant = allRestaurants[selectedRid];
+      document.getElementById('login-rest-name').textContent = `${currentRestaurant.emoji||''} ${currentRestaurant.name}`;
+      document.getElementById('step-select').style.display = 'none';
+      document.getElementById('step-password').style.display = 'flex';
+      setTimeout(() => document.getElementById('pwd-input').focus(), 100);
+    }
+
+    function goBack() {
+      document.getElementById('step-password').style.display = 'none';
+      document.getElementById('step-select').style.display = 'flex';
+      document.getElementById('pwd-input').value = '';
+      document.getElementById('login-err').textContent = '';
+    }
+
+    function login() {
+      const entered = document.getElementById('pwd-input').value;
+      if (!currentRestaurant) return;
+      // Password is stored in Firebase under restaurants/<rid>/ownerPassword
+      db.ref(`restaurants/${selectedRid}/ownerPassword`).once('value', snap => {
+        const storedPwd = snap.val();
+        // Default password = restaurant name lowercased if not set yet
+        const validPwd = storedPwd || 'owner1234';
+        if (entered === validPwd) {
+          sessionStorage.setItem('dishify_owner_rid', selectedRid);
+          sessionStorage.setItem('dishify_owner_name', currentRestaurant.name);
+          showApp();
+        } else {
+          document.getElementById('login-err').textContent = 'Incorrect password. Try again.';
+          document.getElementById('pwd-input').value = '';
+          document.getElementById('pwd-input').focus();
+        }
+      });
+    }
+
+    function showApp() {
+      document.getElementById('step-select').style.display = 'none';
+      document.getElementById('step-password').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      const rname = sessionStorage.getItem('dishify_owner_name') || '';
+      const rid = sessionStorage.getItem('dishify_owner_rid');
+      document.getElementById('header-rest-name').textContent = rname;
+      document.getElementById('page-title').textContent = rname + ' Orders';
+      document.getElementById('page-subtitle').textContent = `Live dashboard — ${new Date().toLocaleDateString('en-PK',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}`;
+      loadOrders(rid);
+    }
+
+    function logout() {
+      sessionStorage.removeItem('dishify_owner_rid');
+      sessionStorage.removeItem('dishify_owner_name');
+      location.reload();
+    }
+
+    // ── AUTO-LOGIN CHECK ──
+    (function() {
+      const savedRid = sessionStorage.getItem('dishify_owner_rid');
+      if (savedRid) {
+        selectedRid = savedRid;
+        db.ref(`restaurants/${savedRid}`).once('value', snap => {
+          currentRestaurant = snap.val();
+          if (currentRestaurant) showApp();
+          else { sessionStorage.removeItem('dishify_owner_rid'); }
+        });
+      }
+    })();
+
+    // ── ORDERS ──
+    function loadOrders(rid) {
+      db.ref(`orders/${rid}`).on('value', snap => {
+        allOrders = {};
+        const raw = snap.val() || {};
+        Object.entries(raw).forEach(([oid, order]) => {
+          allOrders[oid] = { ...order, _oid: oid };
+        });
+        if (initialized) {
+          Object.values(allOrders).forEach(o => {
+            if (!knownOrderIds.has(o._oid) && o.status === 'new') {
+              showNotif(`🔔 New order from ${o.table || 'Walk-in'}!`);
+            }
+          });
+        }
+        Object.keys(allOrders).forEach(id => knownOrderIds.add(id));
+        initialized = true;
+        updateStats();
+        renderOrders(rid);
+      });
+    }
+
+    function updateStats() {
+      const orders = Object.values(allOrders);
+      const today = new Date().toDateString();
+      const todayOrders = orders.filter(o => new Date(o.timestamp).toDateString() === today);
+      const todayRevenue = todayOrders.reduce((s,o) => s+(o.total||0), 0);
+      const avgOrder = todayOrders.length ? Math.round(todayRevenue / todayOrders.length) : 0;
+      document.getElementById('stat-new').textContent = orders.filter(o=>o.status==='new').length;
+      document.getElementById('stat-prep').textContent = orders.filter(o=>o.status==='preparing').length;
+      document.getElementById('stat-ready').textContent = orders.filter(o=>o.status==='ready').length;
+      document.getElementById('stat-today').textContent = todayOrders.length;
+      document.getElementById('stat-revenue').textContent = `PKR ${todayRevenue.toLocaleString()}`;
+      document.getElementById('stat-avg').textContent = todayOrders.length ? `PKR ${avgOrder.toLocaleString()}` : '—';
+    }
+
+    function renderOrders(rid) {
+      const grid = document.getElementById('orders-grid');
+      let orders = Object.values(allOrders);
+      const statusOrder = {new:0,preparing:1,ready:2,done:3};
+      orders.sort((a,b) => {
+        const sd = (statusOrder[a.status]||0)-(statusOrder[b.status]||0);
+        return sd !== 0 ? sd : b.timestamp - a.timestamp;
+      });
+      if (!orders.length) {
+        grid.innerHTML = '<div class="empty-orders"><h3>No Orders</h3><p>Waiting for first order…</p></div>';
+        return;
+      }
+      grid.innerHTML = orders.map(o => {
+        const chip = {
+          new:`<span class="status-chip chip-new">✦ New</span>`,
+          preparing:`<span class="status-chip chip-preparing">⏳ Preparing</span>`,
+          ready:`<span class="status-chip chip-ready">✓ Ready</span>`,
+          done:`<span class="status-chip chip-done">Done</span>`
+        }[o.status]||'';
+        const itemsHtml = (o.items||[]).map(i=>`
+          <div class="order-line">
+            <span class="order-line-name">${i.name} <span class="order-line-qty">×${i.qty}</span></span>
+            <span class="order-line-price">PKR ${(i.price*i.qty).toLocaleString()}</span>
+          </div>`).join('');
+        const actionBtns = o.status !== 'done' ? `
+          <div class="status-btns">
+            ${o.status!=='preparing'&&o.status!=='ready'?`<button class="status-btn btn-preparing" onclick="updateStatus('${rid}','${o._oid}','preparing')">⏳ Preparing</button>`:''}
+            ${o.status!=='ready'?`<button class="status-btn btn-ready" onclick="updateStatus('${rid}','${o._oid}','ready')">✓ Ready</button>`:''}
+            <button class="status-btn btn-done" onclick="updateStatus('${rid}','${o._oid}','done')">✓ Done</button>
+          </div>` : '<p style="font-size:.75rem;color:#555;letter-spacing:.1em">Order completed</p>';
+        return `<div class="order-card status-${o.status}">
+          <div class="order-header">
+            <div>
+              <div class="order-id">#${o.id||o._oid.slice(-6).toUpperCase()}</div>
+              <div class="order-table">${o.table||'Walk-in'}</div>
+            </div>
+            <div style="text-align:right">${chip}<br><span style="font-size:.68rem;color:var(--cream-dim)">${o.timestampStr||''}</span></div>
+          </div>
+          <div class="order-items-list">${itemsHtml}</div>
+          <div class="order-total-row"><span>Total</span><span>PKR ${(o.total||0).toLocaleString()}</span></div>
+          ${actionBtns}
+        </div>`;
+      }).join('');
+    }
+
+    function updateStatus(rid, oid, status) {
+      db.ref(`orders/${rid}/${oid}/status`).set(status);
+    }
+
+    // ── PASSWORD CHANGE ──
+    function openPwdModal() {
+      document.getElementById('pwd-modal').classList.add('open');
+      document.getElementById('pwd-current').value='';
+      document.getElementById('pwd-new').value='';
+      document.getElementById('pwd-confirm').value='';
+      document.getElementById('pwd-err').textContent='';
+    }
+    function closePwdModal() { document.getElementById('pwd-modal').classList.remove('open'); }
+
+    function changePassword() {
+      const current = document.getElementById('pwd-current').value;
+      const newPwd = document.getElementById('pwd-new').value;
+      const confirm = document.getElementById('pwd-confirm').value;
+      const rid = sessionStorage.getItem('dishify_owner_rid');
+      const errEl = document.getElementById('pwd-err');
+      if (!current || !newPwd || !confirm) { errEl.textContent='All fields required'; return; }
+      if (newPwd !== confirm) { errEl.textContent='New passwords do not match'; return; }
+      if (newPwd.length < 4) { errEl.textContent='Password must be at least 4 characters'; return; }
+      db.ref(`restaurants/${rid}/ownerPassword`).once('value', snap => {
+        const storedPwd = snap.val() || 'owner1234';
+        if (current !== storedPwd) { errEl.textContent='Current password is incorrect'; return; }
+        db.ref(`restaurants/${rid}/ownerPassword`).set(newPwd).then(() => {
+          closePwdModal();
+          showToast('✓ Password updated successfully');
+        });
+      });
+    }
+
+    function showNotif(msg) {
+      const old=document.querySelector('.notif-toast'); if(old) old.remove();
+      const t=document.createElement('div'); t.className='notif-toast'; t.textContent=msg;
+      document.body.appendChild(t);
+      try { const ctx=new AudioContext(); const o=ctx.createOscillator(); const g=ctx.createGain(); o.connect(g); g.connect(ctx.destination); o.frequency.value=880; g.gain.setValueAtTime(0.3,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4); o.start(); o.stop(ctx.currentTime+0.4); } catch(e){}
+      setTimeout(()=>t.remove(),4000);
+    }
+    function showToast(msg) {
+      const old=document.querySelector('.toast'); if(old) old.remove();
+      const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+      document.body.appendChild(t); setTimeout(()=>t.remove(),3000);
+    }
+  </script>
+</body>
+</html>
