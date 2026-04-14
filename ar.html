@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>AR Viewer — Dishify</title>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <!-- MindAR image tracking + Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Outfit',sans-serif}
+    #loading{position:fixed;inset:0;z-index:100;background:#07060a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#f0e8d5}
+    #loading-logo{font-size:2rem;font-weight:300;letter-spacing:.1em;color:#c9a84c}
+    #loading-ring{width:48px;height:48px;border:2px solid #2a2520;border-top-color:#c9a84c;border-radius:50%;animation:spin .8s linear infinite}
+    #loading-msg{font-size:.88rem;color:rgba(240,232,213,.6);letter-spacing:.05em;text-align:center;max-width:280px;line-height:1.6}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #ar-container{position:fixed;inset:0;z-index:1}
+    #hud{position:fixed;bottom:0;left:0;right:0;z-index:50;padding:20px;background:linear-gradient(to top,rgba(7,6,4,.9),transparent)}
+    .hud-card{background:rgba(14,13,10,.92);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;backdrop-filter:blur(10px)}
+    .hud-info{flex:1;min-width:0}
+    .hud-name{font-size:1.1rem;font-weight:500;color:#f0e8d5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hud-price{font-size:.88rem;color:#c9a84c;margin-top:2px}
+    .hud-hint{font-size:.74rem;color:rgba(240,232,213,.5);margin-top:4px}
+    .hud-close{padding:10px 18px;background:#c9a84c;color:#07060a;border:none;border-radius:4px;font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap;flex-shrink:0}
+    .hud-close:hover{background:#e8c97a}
+    #target-hint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:40;text-align:center;pointer-events:none;transition:opacity .4s}
+    .hint-box{background:rgba(7,6,4,.75);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:20px 28px;backdrop-filter:blur(8px)}
+    .hint-icon{font-size:2.4rem;display:block;margin-bottom:10px}
+    .hint-text{font-size:.9rem;color:rgba(240,232,213,.85);line-height:1.6;max-width:240px}
+    .hint-text strong{color:#c9a84c;display:block;font-size:1rem;margin-bottom:4px}
+    #found-flash{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(76,175,125,.15);border:1px solid rgba(76,175,125,.5);border-radius:6px;padding:10px 22px;font-size:.82rem;color:#4caf7d;letter-spacing:.08em;display:none;animation:fadeIn .3s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    #err-screen{position:fixed;inset:0;z-index:200;background:#07060a;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center}
+    #err-screen h2{font-size:1.5rem;color:#c9a84c}
+    #err-screen p{font-size:.88rem;color:rgba(240,232,213,.6);line-height:1.7;max-width:320px}
+    #err-screen a{color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.4);padding:10px 22px;border-radius:4px;margin-top:8px}
+  </style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div id="loading-logo">DISHIFY</div>
+  <div id="loading-ring"></div>
+  <div id="loading-msg">Starting AR camera…<br>Please allow camera access when prompted.</div>
+</div>
+
+<!-- ERROR SCREEN -->
+<div id="err-screen">
+  <h2>AR Not Available</h2>
+  <p id="err-msg">Could not start AR. This may be because no AR target has been compiled for this restaurant, or camera access was denied.</p>
+  <a id="err-back" href="index.html">← Back to Home</a>
+</div>
+
+<!-- FOUND FLASH -->
+<div id="found-flash">✦ QR Detected — dish appearing</div>
+
+<!-- AR SCENE CONTAINER -->
+<div id="ar-container"></div>
+
+<!-- HUD -->
+<div id="hud" style="display:none">
+  <div class="hud-card">
+    <div class="hud-info">
+      <div class="hud-name" id="hud-name">—</div>
+      <div class="hud-price" id="hud-price"></div>
+      <div class="hud-hint">Point camera at the QR code on your table</div>
+    </div>
+    <button class="hud-close" onclick="closeAR()">✕ Exit</button>
+  </div>
+</div>
+
+<!-- TARGET HINT -->
+<div id="target-hint">
+  <div class="hint-box">
+    <span class="hint-icon">📱</span>
+    <div class="hint-text"><strong>Point at the QR code</strong>Hold your camera steady over the QR code on your table to see the dish in AR.</div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+const params=new URLSearchParams(location.search);
+const rid=params.get('r');
+const itemName=params.get('item')||'';
+let mindarThree=null;
+
+function showErr(msg){
+  document.getElementById('loading').style.display='none';
+  document.getElementById('err-screen').style.display='flex';
+  document.getElementById('err-msg').textContent=msg;
+  document.getElementById('err-back').href='menu.html?r='+(rid||'');
+}
+
+async function init(){
+  if(!rid){showErr('No restaurant ID. Please scan the QR code again.');return;}
+
+  // Load restaurant data
+  const snap=await db.ref('restaurants/'+rid).once('value');
+  const rest=snap.val();
+  if(!rest){showErr('Restaurant not found.');return;}
+
+  const mindUrl=rest.arTarget;
+  if(!mindUrl){showErr('No AR target compiled for this restaurant. Ask the admin to go to Admin → QR Codes → Compile AR Target.');return;}
+
+  // Find item's model
+  let modelUrl='',displayName=itemName,displayPrice='';
+  if(rest.menu){
+    const menuItems=Object.values(rest.menu);
+    // Find by name or first with AR
+    let item=menuItems.find(i=>i.name===itemName&&i.model);
+    if(!item)item=menuItems.find(i=>i.model);
+    if(item){modelUrl=item.model;displayName=item.name;displayPrice=item.price?`PKR ${Number(item.price).toLocaleString()}`:''; }
+  }
+  if(!modelUrl){showErr('No 3D model found for this item. Ask the admin to upload a .glb file for the menu item.');return;}
+
+  document.getElementById('hud-name').textContent=displayName;
+  document.getElementById('hud-price').textContent=displayPrice;
+  document.getElementById('loading-msg').textContent='Loading AR scene…';
+
+  try{
+    // Initialise MindAR
+    const {MindARThree}=window.MINDAR.IMAGE;
+    mindarThree=new MindARThree({
+      container:document.getElementById('ar-container'),
+      imageTargetSrc:mindUrl,
+      maxTrack:1,
+      uiLoading:'no',
+      uiScanning:'no',
+      uiError:'no',
+    });
+
+    const {renderer,scene,camera}=mindarThree;
+
+    // Load GLB model via Three.js GLTFLoader
+    const THREE=window.THREE;
+    // Load GLTFLoader dynamically
+    if(!THREE.GLTFLoader){
+      await loadScript('https://cdn.jsdelivr.net/npm/three@0.154.0/examples/js/loaders/GLTFLoader.js');
+    }
+
+    // Ambient + directional light
+    const ambient=new THREE.AmbientLight(0xffffff,1.2);
+    scene.add(ambient);
+    const dirLight=new THREE.DirectionalLight(0xffffff,1.5);
+    dirLight.position.set(1,2,1);
+    scene.add(dirLight);
+
+    // Anchor — attach model to image target index 0
+    const anchor=mindarThree.addAnchor(0);
+    anchor.onTargetFound=()=>{
+      const flash=document.getElementById('found-flash');
+      flash.style.display='block';
+      document.getElementById('target-hint').style.opacity='0';
+      setTimeout(()=>{flash.style.display='none';},2500);
+    };
+    anchor.onTargetLost=()=>{
+      document.getElementById('target-hint').style.opacity='1';
+    };
+
+    document.getElementById('loading-msg').textContent='Loading 3D model…';
+
+    // Load GLB
+    const loader=new THREE.GLTFLoader();
+    const gltf=await new Promise((res,rej)=>loader.load(modelUrl,res,undefined,rej));
+    const model=gltf.scene;
+
+    // Auto-scale: fit model to ~0.15m above marker (QR is ~10cm)
+    const box=new THREE.Box3().setFromObject(model);
+    const size=new THREE.Vector3();
+    box.getSize(size);
+    const maxDim=Math.max(size.x,size.y,size.z);
+    const targetSize=0.12; // 12cm — a realistic dish size above QR
+    const scale=targetSize/maxDim;
+    model.scale.setScalar(scale);
+
+    // Centre model horizontally, lift it slightly above the marker plane
+    const centre=new THREE.Vector3();
+    box.getCenter(centre);
+    model.position.sub(centre.multiplyScalar(scale));
+    model.position.y=size.y*scale*0.5+0.01; // sit just on top of QR
+
+    // Optional: gentle rotation animation
+    const pivot=new THREE.Object3D();
+    pivot.add(model);
+    anchor.group.add(pivot);
+
+    renderer.setAnimationLoop(()=>{
+      pivot.rotation.y+=0.008;
+      renderer.render(scene,camera);
+    });
+
+    await mindarThree.start();
+
+    document.getElementById('loading').style.display='none';
+    document.getElementById('hud').style.display='block';
+
+  }catch(e){
+    console.error('MindAR init error:',e);
+    showErr('Failed to start AR: '+e.message+'. Make sure camera permission is granted.');
+  }
+}
+
+function closeAR(){
+  if(mindarThree){try{mindarThree.stop();}catch(e){}}
+  window.history.back();
+}
+
+function loadScript(src){
+  return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+}
+
+// Kickoff
+init();
+</script>
+</body>
+</html>
