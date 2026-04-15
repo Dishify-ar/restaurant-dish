@@ -46,7 +46,6 @@
     .card-title{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:400;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:10px}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
     .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
-    .grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:18px}
     label{display:block;font-size:.68rem;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
     input,select,textarea{width:100%;padding:11px 15px;background:#13110d;border:1px solid #3a3020;color:var(--cream);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.9rem;transition:border-color .2s;outline:none}
     input:focus,select:focus,textarea:focus{border-color:var(--gold)}
@@ -91,7 +90,7 @@
     .rpill{padding:5px 12px;background:#13110d;border:1px solid #2a2520;border-radius:2px;font-size:.72rem;color:var(--cream-dim)}
     .rpill span{color:var(--gold);font-weight:600}
     .img-preview{width:64px;height:48px;object-fit:cover;border-radius:3px;border:1px solid #3a3020;margin-top:6px;display:none}
-    /* FILE UPLOAD ZONES */
+    /* ── FILE UPLOAD ZONES ── */
     .upload-zone{border:2px dashed #3a3020;border-radius:5px;padding:22px 18px;text-align:center;cursor:pointer;transition:all .25s;position:relative;background:#0d0b08}
     .upload-zone:hover,.upload-zone.dragover{border-color:var(--gold);background:var(--gold-dim)}
     .upload-zone-icon{font-size:1.8rem;display:block;margin-bottom:6px}
@@ -105,10 +104,11 @@
     .upload-thumb{width:64px;height:48px;object-fit:cover;border-radius:3px;border:1px solid #3a3020;display:none;margin-top:8px}
     .curr-asset{display:none;align-items:center;gap:8px;margin-bottom:8px;font-size:.76rem;color:var(--cream-dim)}
     .curr-asset img{width:56px;height:42px;object-fit:cover;border-radius:3px;border:1px solid #3a3020}
+
     /* EDIT MODAL */
     .modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px}
     .modal-overlay.open{display:flex}
-    .modal-box{background:var(--ink2);border:1px solid var(--gold);border-radius:8px;padding:40px;width:680px;max-width:96vw;max-height:90vh;overflow-y:auto}
+    .modal-box{background:var(--ink2);border:1px solid var(--gold);border-radius:8px;padding:40px;width:640px;max-width:96vw;max-height:90vh;overflow-y:auto}
     .modal-title{font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--gold);margin-bottom:6px}
     .modal-sub{font-size:.78rem;color:var(--cream-dim);margin-bottom:24px}
     .modal-btns{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
@@ -119,12 +119,9 @@
     .inq-type{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;padding:3px 10px;border:1px solid var(--gold-dim);color:var(--gold);border-radius:2px}
     .inq-meta{font-size:.75rem;color:var(--cream-dim);margin-bottom:8px}
     .inq-msg{font-size:.84rem;color:var(--cream-dim);line-height:1.65}
-    /* STORAGE WARNING */
-    .storage-warn{background:rgba(191,64,64,.08);border:1px solid rgba(191,64,64,.3);border-radius:4px;padding:12px 16px;font-size:.78rem;color:#e07070;line-height:1.6;margin-bottom:14px;display:none}
-    .storage-warn strong{color:#bf4040}
     .toast{position:fixed;bottom:30px;right:30px;background:var(--ink3);border:1px solid var(--gold);color:var(--cream);padding:14px 22px;border-radius:4px;font-size:.85rem;z-index:2000;animation:toastSlide .3s ease}
     @keyframes toastSlide{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
-    @media(max-width:900px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
+    @media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
     @media(max-width:700px){.sidebar{display:none}.main{margin-left:0;padding:20px}}
   </style>
 </head>
@@ -157,8 +154,8 @@
         <div class="form-group"><label>Description</label><input id="er-desc" placeholder="Short tagline…"></div>
       </div>
       <div class="form-group">
-        <label>Restaurant Photo URL <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">(or upload below)</span></label>
-        <input id="er-photo" placeholder="https://images.unsplash.com/…" oninput="prevImg('er-photo','er-photo-prev')">
+        <label>Restaurant Photo URL <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">(replaces cuisine default)</span></label>
+        <input id="er-photo" placeholder="https://images.unsplash.com/… or any public image URL" oninput="prevImg('er-photo','er-photo-prev')">
         <img id="er-photo-prev" class="img-preview" alt="preview">
       </div>
       <div class="form-group">
@@ -178,7 +175,7 @@
       </div>
       <div class="grid-2">
         <div class="form-group"><label>Owner Name / Contact</label><input id="er-owner" placeholder="Ahmad Khan · +92-300-…"></div>
-        <div class="form-group"><label>New Owner Password <span style="font-size:.7rem;text-transform:none;letter-spacing:0;color:var(--cream-dim)">(leave blank to keep)</span></label><input type="password" id="er-password" placeholder="Leave blank to keep"></div>
+        <div class="form-group"><label>New Owner Password <span style="font-size:.7rem;text-transform:none;letter-spacing:0;color:var(--cream-dim)">(leave blank to keep current)</span></label><input type="password" id="er-password" placeholder="Leave blank to keep"></div>
       </div>
       <div class="modal-btns">
         <button class="btn btn-gold" onclick="saveRestaurant()">Save Changes</button>
@@ -191,7 +188,7 @@
   <div class="modal-overlay" id="edit-item-modal">
     <div class="modal-box">
       <div class="modal-title">Edit Menu Item</div>
-      <div class="modal-sub">Update item details, photo, portion size, AR model or tags.</div>
+      <div class="modal-sub">Update item details, photo, AR model or tags.</div>
       <input type="hidden" id="ei-rid">
       <input type="hidden" id="ei-key">
       <div class="grid-3">
@@ -199,19 +196,35 @@
         <div class="form-group"><label>Category</label><input id="ei-cat" placeholder="Mains"></div>
         <div class="form-group"><label>Price (PKR)</label><input type="number" id="ei-price"></div>
       </div>
-      <div class="grid-2">
-        <div class="form-group"><label>Emoji</label><input id="ei-emoji" placeholder="🍕"></div>
-        <div class="form-group"><label>Portion / Meal Size <span style="font-size:.68rem;text-transform:none;letter-spacing:0;color:var(--cream-dim)">(shown on menu)</span></label><input id="ei-size" placeholder="e.g. 350g · Serves 1 · 12 inch"></div>
+      <div class="form-group"><label>Emoji</label><input id="ei-emoji" placeholder="🍕" style="max-width:120px"></div>
+      <div class="form-group">
+        <label>Dish Photo <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— upload new to replace</span></label>
+        <div id="eip-curr" style="display:none;align-items:center;gap:8px;margin-bottom:8px;font-size:.76rem;color:var(--cream-dim)">
+          <img id="eip-curr-img" style="width:56px;height:42px;object-fit:cover;border-radius:3px;border:1px solid #3a3020" src="" alt="">
+          <span>Current photo</span>
+        </div>
+        <label class="upload-zone" for="eip-file" style="cursor:pointer">
+          <input type="file" id="eip-file" accept="image/*" style="display:none" onchange="doUpload(this,'eip','image')">
+          <span class="upload-zone-icon">📸</span>
+          <div class="upload-zone-label"><strong>Click or drop dish photo</strong>JPG, PNG, WebP</div>
+        </label>
+        <div class="upload-bar-wrap" id="eip-bar-wrap"><div class="upload-bar" id="eip-bar"></div></div>
+        <div class="upload-status" id="eip-status"></div>
+        <div class="upload-ok" id="eip-ok"></div>
+        <input type="hidden" id="eip-url">
       </div>
       <div class="form-group">
-        <label>AR Model URL (.glb) <span style="font-size:.68rem;text-transform:none;letter-spacing:0;color:var(--cream-dim)">— or upload below</span></label>
-        <input id="ei-model" placeholder="Direct .glb URL (poly.pizza recommended)" oninput="previewModelLink(this.value,'ei-model-prev')">
-        <div id="ei-model-prev" style="display:none;margin-top:6px;padding:8px 12px;border-radius:3px;font-size:.74rem;line-height:1.5"></div>
-      </div>
-      <div class="form-group">
-        <label>Dish Photo URL <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">(or upload below)</span></label>
-        <input id="ei-photo" placeholder="https://images.unsplash.com/…" oninput="prevImg('ei-photo','ei-photo-prev')">
-        <img id="ei-photo-prev" class="img-preview" alt="preview">
+        <label>AR 3D Model <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— upload .glb to replace</span></label>
+        <div id="eim-curr" style="display:none;font-size:.76rem;color:#4caf7d;margin-bottom:8px">✦ AR model currently set</div>
+        <label class="upload-zone" for="eim-file" style="cursor:pointer">
+          <input type="file" id="eim-file" accept=".glb,.gltf" style="display:none" onchange="doUpload(this,'eim','glb')">
+          <span class="upload-zone-icon">🥽</span>
+          <div class="upload-zone-label"><strong>Click or drop .glb model</strong>.glb / .gltf</div>
+        </label>
+        <div class="upload-bar-wrap" id="eim-bar-wrap"><div class="upload-bar" id="eim-bar"></div></div>
+        <div class="upload-status" id="eim-status"></div>
+        <div class="upload-ok" id="eim-ok"></div>
+        <input type="hidden" id="eim-url">
       </div>
       <div class="form-group"><label>Description</label><textarea id="ei-desc" placeholder="Describe the dish…"></textarea></div>
       <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:8px">
@@ -262,20 +275,16 @@
           <div class="stat-card"><div class="stat-val" id="stat-orders-today">—</div><div class="stat-label">Orders Today</div></div>
           <div class="stat-card"><div class="stat-val" id="stat-revenue-today" style="font-size:1.8rem">—</div><div class="stat-label">Revenue Today</div></div>
         </div>
-        <div class="seed-banner" id="seed-banner"><p><strong>No restaurants yet?</strong> Seed with sample data to test the platform.</p><button class="btn btn-gold" onclick="seedDatabase()">Seed Sample Data</button></div>
+        <div class="seed-banner" id="seed-banner"><p><strong>No restaurants yet?</strong> Seed with sample data.</p><button class="btn btn-gold" onclick="seedDatabase()">Seed Sample Data</button></div>
         <div class="card">
-          <div class="card-title">📋 Quick Setup Guide</div>
-          <p style="font-size:.85rem;color:var(--cream-dim);line-height:1.9">
-            1. <strong style="color:var(--gold)">Restaurants</strong> → Add name, select a vibe theme, set owner password.<br>
-            2. <strong style="color:var(--gold)">Menu Editor</strong> → Upload dish photos &amp; .glb AR models directly — no Drive needed.<br>
-            3. <strong style="color:var(--gold)">QR Codes</strong> → Generate, download and print table QR codes.<br>
-            4. Restaurant owner logs in at <strong style="color:var(--gold)">owner.html</strong> to see live orders and update status.<br>
-            5. Customers see order status <strong style="color:var(--gold)">live on their phone</strong> — notified when Preparing &amp; Ready.<br>
-            6. For AR: Enable <strong style="color:var(--gold)">Firebase Storage</strong> in your Firebase Console (see info-box below).
+          <div class="card-title">📋 Quick Guide</div>
+          <p style="font-size:.85rem;color:var(--cream-dim);line-height:1.8">
+            1. <strong style="color:var(--gold)">Restaurants</strong> → add name, vibe, photo URL, owner password.<br>
+            2. <strong style="color:var(--gold)">Menu Editor</strong> → add items with a dish photo URL and optional .glb AR model.<br>
+            3. <strong style="color:var(--gold)">QR Codes</strong> → generate &amp; download table QR codes.<br>
+            4. Owner logs in at <strong style="color:var(--gold)">owner.html</strong> → selects restaurant → enters password → sees live orders.<br>
+            5. <strong style="color:var(--gold)">Inquiries</strong> → view messages from the contact form.
           </p>
-        </div>
-        <div class="info-box"><strong>⚠ Firebase Storage — Required for photo/model upload</strong><br>
-          Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold)">console.firebase.google.com</a> → Your project → <strong>Build → Storage</strong> → Get started → Start in test mode → Done. This allows direct file uploads from this admin panel.
         </div>
       </div>
 
@@ -297,24 +306,18 @@
           </div>
           <div class="form-group">
             <label>Restaurant Photo <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— upload JPG/PNG directly</span></label>
-            <div id="storage-warn-rp" class="storage-warn"><strong>Storage not enabled.</strong> Enable Firebase Storage (see Dashboard guide) to upload files directly. Or paste an image URL in the field below instead.</div>
-            <div class="upload-zone" id="rp-zone" onclick="document.getElementById('rp-file').click()">
-              <input type="file" id="rp-file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="doUpload(this,'rp','image')">
+            <label class="upload-zone" id="rp-zone" for="rp-file" style="cursor:pointer">
+              <input type="file" id="rp-file" accept="image/*" style="display:none" onchange="doUpload(this,'rp','image')">
               <span class="upload-zone-icon">🖼️</span>
               <div class="upload-zone-label"><strong>Click or drag &amp; drop photo</strong>JPG, PNG, WebP · max 5 MB</div>
-            </div>
+            </label>
             <div class="upload-bar-wrap" id="rp-bar-wrap"><div class="upload-bar" id="rp-bar"></div></div>
             <div class="upload-status" id="rp-status"></div>
             <div class="upload-ok" id="rp-ok"></div>
             <img class="upload-thumb" id="rp-thumb" alt="">
             <input type="hidden" id="rp-url">
-            <div class="form-group" style="margin-top:10px;margin-bottom:0">
-              <label style="font-size:.62rem">Or paste photo URL directly</label>
-              <input id="rest-photo-url" placeholder="https://images.unsplash.com/…" oninput="if(this.value){document.getElementById('rp-url').value=this.value;document.getElementById('rest-photo-prev').src=this.value;document.getElementById('rest-photo-prev').style.display='block';}else document.getElementById('rest-photo-prev').style.display='none'">
-              <img id="rest-photo-prev" class="img-preview" alt="preview">
-            </div>
           </div>
-          <div class="info-box"><strong>🔐 Owner Authentication</strong><br>Set the owner password. Restaurant owners use this to log into the Orders page to see live orders and update status. You can change it any time from the Edit button.</div>
+          <div class="info-box"><strong>🔐 Owner Authentication</strong><br>Set the owner password. The restaurant owner uses this to log into the Orders page. You can change it any time from the Edit button.</div>
           <div class="grid-2">
             <div class="form-group"><label>Owner Name / Contact</label><input id="rest-owner" placeholder="Ahmad Khan · +92-300-…"></div>
             <div class="form-group"><label>Owner Password *</label><input type="password" id="rest-password" placeholder="Min 4 characters"></div>
@@ -346,57 +349,41 @@
       <!-- MENU EDITOR -->
       <div class="panel" id="panel-menu">
         <div class="page-title">Menu Editor</div>
-        <div class="page-subtitle">Add items with dish photos and optional AR 3D models. Portion size is displayed on the menu card. Click "Edit" on any item to update.</div>
+        <div class="page-subtitle">Add items with dish photos and optional AR models. Click "Edit" on any item to update it.</div>
         <div class="card">
           <div class="card-title">➕ Add Menu Item</div>
           <div class="form-group"><label>Restaurant</label><select id="menu-rest"></select></div>
-          <div class="grid-4">
-            <div class="form-group"><label>Item Name</label><input id="item-name" placeholder="Margherita Pizza"></div>
+          <div class="grid-3">
+            <div class="form-group"><label>Item Name</label><input id="item-name" placeholder="e.g. Margherita Pizza"></div>
             <div class="form-group"><label>Category</label><input id="item-cat" placeholder="Starters / Mains…"></div>
             <div class="form-group"><label>Price (PKR)</label><input type="number" id="item-price" placeholder="850"></div>
-            <div class="form-group"><label>Emoji</label><input id="item-emoji" placeholder="🍕" style="font-size:1.2rem"></div>
           </div>
+          <div class="form-group"><label>Emoji</label><input id="item-emoji" placeholder="🍕" style="font-size:1.3rem;max-width:120px"></div>
           <div class="form-group">
-            <label>Portion / Meal Size <span style="font-size:.68rem;text-transform:none;letter-spacing:0;color:var(--cream-dim)">— shown next to price on the menu (e.g. "350g", "Serves 2", "12 inch")</span></label>
-            <input id="item-size" placeholder="e.g. 350g · Serves 1 · 12 inch pizza">
-          </div>
-          <div class="form-group">
-            <label>Dish Photo * <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— shown on menu card (upload directly)</span></label>
-            <div id="storage-warn-ip" class="storage-warn"><strong>Storage not enabled.</strong> Enable Firebase Storage to upload files. Or paste a photo URL in the field below.</div>
-            <div class="upload-zone" onclick="document.getElementById('ip-file').click()">
-              <input type="file" id="ip-file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="doUpload(this,'ip','image')">
+            <label>Dish Photo * <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— shown on menu card</span></label>
+            <label class="upload-zone" for="ip-file" style="cursor:pointer">
+              <input type="file" id="ip-file" accept="image/*" style="display:none" onchange="doUpload(this,'ip','image')">
               <span class="upload-zone-icon">📸</span>
               <div class="upload-zone-label"><strong>Click or drag &amp; drop dish photo</strong>JPG, PNG, WebP · max 5 MB</div>
-            </div>
+            </label>
             <div class="upload-bar-wrap" id="ip-bar-wrap"><div class="upload-bar" id="ip-bar"></div></div>
             <div class="upload-status" id="ip-status"></div>
             <div class="upload-ok" id="ip-ok"></div>
             <img class="upload-thumb" id="ip-thumb" alt="">
             <input type="hidden" id="ip-url">
-            <div class="form-group" style="margin-top:10px;margin-bottom:0">
-              <label style="font-size:.62rem">Or paste photo URL directly</label>
-              <input id="item-photo-url" placeholder="https://images.unsplash.com/… or any food image URL" oninput="if(this.value){document.getElementById('ip-url').value=this.value;document.getElementById('item-photo-prev').src=this.value;document.getElementById('item-photo-prev').style.display='block';}else document.getElementById('item-photo-prev').style.display='none'">
-              <img id="item-photo-prev" class="img-preview" alt="preview">
-            </div>
           </div>
           <div class="form-group">
-            <label>AR 3D Model <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— optional, upload .glb directly OR paste URL</span></label>
-            <div id="storage-warn-im" class="storage-warn"><strong>Storage not enabled.</strong> Enable Firebase Storage to upload .glb files. Or paste a direct .glb URL below.</div>
-            <div class="upload-zone" onclick="document.getElementById('im-file').click()">
-              <input type="file" id="im-file" accept=".glb,.gltf" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="doUpload(this,'im','glb')">
+            <label>AR 3D Model <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— optional, upload .glb directly</span></label>
+            <label class="upload-zone" for="im-file" style="cursor:pointer">
+              <input type="file" id="im-file" accept=".glb,.gltf" style="display:none" onchange="doUpload(this,'im','glb')">
               <span class="upload-zone-icon">🥽</span>
               <div class="upload-zone-label"><strong>Click or drag &amp; drop .glb 3D model</strong>.glb / .gltf · max 50 MB</div>
-              <div class="upload-zone-hint">Free food models: <a href="https://poly.pizza" target="_blank" style="color:var(--gold)">poly.pizza</a> → Download → upload here</div>
-            </div>
+              <div class="upload-zone-hint">Free food models: poly.pizza — download .glb and upload here</div>
+            </label>
             <div class="upload-bar-wrap" id="im-bar-wrap"><div class="upload-bar" id="im-bar"></div></div>
             <div class="upload-status" id="im-status"></div>
             <div class="upload-ok" id="im-ok"></div>
             <input type="hidden" id="im-url">
-            <div class="form-group" style="margin-top:10px;margin-bottom:0">
-              <label style="font-size:.62rem">Or paste .glb URL directly (poly.pizza / public hosting)</label>
-              <input id="item-model-url" placeholder="https://uploads.poly.pizza/m/…/model.glb" oninput="if(this.value){document.getElementById('im-url').value=this.value;}previewModelLink(this.value,'item-model-prev')">
-              <div id="item-model-prev" style="display:none;margin-top:6px;padding:8px 12px;border-radius:3px;font-size:.74rem;line-height:1.5"></div>
-            </div>
           </div>
           <div class="form-group"><label>Description</label><textarea id="item-desc" placeholder="Describe the dish…"></textarea></div>
           <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px">
@@ -410,15 +397,15 @@
         <div class="card">
           <div class="card-title">🍽️ Current Menu Items</div>
           <div class="form-group" style="max-width:300px"><label>Filter by Restaurant</label><select id="menu-filter" onchange="filterMenu()"></select></div>
-          <table><thead><tr><th>Item</th><th>Photo</th><th>Category</th><th>Size</th><th>Price</th><th>AR</th><th>Tags</th><th>Actions</th></tr></thead>
-          <tbody id="menu-list-body"><tr class="empty-row"><td colspan="8">Select a restaurant</td></tr></tbody></table>
+          <table><thead><tr><th>Item</th><th>Photo</th><th>Category</th><th>Price</th><th>AR</th><th>Tags</th><th>Actions</th></tr></thead>
+          <tbody id="menu-list-body"><tr class="empty-row"><td colspan="7">Select a restaurant</td></tr></tbody></table>
         </div>
       </div>
 
       <!-- QR -->
       <div class="panel" id="panel-qr">
         <div class="page-title">QR Codes</div>
-        <div class="page-subtitle">Generate table QR codes. Guests scan → see the menu → order → track status on their phone.</div>
+        <div class="page-subtitle">Generate table QR codes. The QR code IS the menu entry point — guests scan it at the table to order.</div>
         <div class="card">
           <div class="card-title">📱 Generate QR Code</div>
           <div class="form-group" style="max-width:300px"><label>Select Restaurant</label><select id="qr-restaurant" onchange="generateQR()"></select></div>
@@ -427,6 +414,15 @@
           <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
             <button class="btn btn-gold" onclick="downloadQR()">Download PNG</button>
             <button class="btn btn-outline" onclick="copyQRUrl()">Copy URL</button>
+          </div>
+          <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;margin-top:8px">
+            <div>
+              <p style="font-size:.8rem;color:var(--cream-dim);line-height:1.7;max-width:340px">
+                After generating the QR, click <strong style="color:var(--gold)">Compile AR Target</strong>. This builds an image-tracking file from your QR code and stores it. When a guest taps <em>View in AR</em> on a menu item and points their camera at the physical QR code, the 3D model will <strong style="color:var(--gold)">appear floating on top of the QR</strong>.
+              </p>
+              <button class="btn btn-gold" id="compile-ar-btn" onclick="compileARTarget()" disabled style="margin-top:14px">Compile AR Target</button>
+              <div id="compile-status" style="font-size:.8rem;color:var(--cream-dim);line-height:1.7;margin-top:10px;display:none"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -460,14 +456,11 @@
 
   <script>
     const ADMIN_PASSWORD = 'dishify2024';
-    const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.appspot.com",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
+    const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
     firebase.initializeApp(firebaseConfig);
     const db=firebase.database();
-    let storage=null;
+    const storage=firebase.storage();
     let allRestaurants={}, allOrders={}, selectedVibe='', editVibeValue='';
-
-    // Try initialising storage — will fail gracefully if not enabled
-    try{storage=firebase.storage();}catch(e){storage=null;}
 
     function login(){
       const val=document.getElementById('pwd-input').value;
@@ -488,26 +481,32 @@
 
     function selectVibe(v,el){document.querySelectorAll('.vibe-grid:not(#er-vibe-grid) .vibe-pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');selectedVibe=v;document.getElementById('rest-vibe').value=v;}
     function selVibeEdit(v,el){document.querySelectorAll('#er-vibe-grid .vibe-pill').forEach(p=>p.classList.remove('selected'));el.classList.add('selected');editVibeValue=v;document.getElementById('er-vibe').value=v;}
-    function prevImg(inputId,imgId){const url=document.getElementById(inputId)?.value.trim();const img=document.getElementById(imgId);if(url&&img){img.src=url;img.style.display='block';}else if(img)img.style.display='none';}
 
-    function initAdmin(){
-      checkStorageAvailability();
-      db.ref('restaurants').on('value',snap=>{allRestaurants=snap.val()||{};updateAllUI();});
-      db.ref('orders').on('value',snap=>{allOrders=snap.val()||{};updateDashboardOrderStats();});
+    function prevImg(inputId,imgId){
+      const url=document.getElementById(inputId).value.trim();
+      const img=document.getElementById(imgId);
+      if(url){img.src=url;img.style.display='block';}else img.style.display='none';
     }
 
-    function checkStorageAvailability(){
-      if(!storage){
-        document.querySelectorAll('.storage-warn').forEach(w=>w.style.display='block');
-        return;
-      }
-      // Ping storage to check if it's set up
-      storage.ref('dishify/ping.txt').getDownloadURL().catch(e=>{
-        if(e.code==='storage/object-not-found'){/* storage is enabled, just file missing */}
-        else if(e.code==='storage/unauthorized'||e.message.includes('does not exist')){
-          document.querySelectorAll('.storage-warn').forEach(w=>w.style.display='block');
-        }
+    let inqInitialized=false;
+    function initAdmin(){
+      db.ref('restaurants').on('value',snap=>{allRestaurants=snap.val()||{};updateAllUI();});
+      db.ref('orders').on('value',snap=>{allOrders=snap.val()||{};updateDashboardOrderStats();});
+      // Real-time inquiry notifications
+      db.ref('inquiries').on('child_added',snap=>{
+        if(!inqInitialized)return;
+        const i=snap.val();
+        showInqNotif(i);
       });
+      setTimeout(()=>{inqInitialized=true;},2000);
+    }
+    function showInqNotif(i){
+      const n=document.createElement('div');
+      n.style.cssText='position:fixed;top:24px;right:24px;z-index:3000;background:var(--ink3);border:1px solid var(--gold);border-left:4px solid var(--gold);border-radius:6px;padding:16px 20px;max-width:320px;animation:toastSlide .4s ease;cursor:pointer';
+      n.innerHTML=`<div style="font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:4px">📩 New Inquiry</div><div style="font-size:.88rem;color:var(--cream);font-weight:500">${i.name||'Anonymous'}</div><div style="font-size:.78rem;color:var(--cream-dim);margin-top:2px">${i.type||'General'} · ${i.email||''}</div><div style="font-size:.8rem;color:var(--cream-dim);margin-top:6px;line-height:1.5">${(i.message||'').slice(0,80)}${i.message&&i.message.length>80?'…':''}</div>`;
+      n.onclick=()=>{n.remove();document.querySelector('.nav-item[onclick*=inquiries]')?.click();};
+      document.body.appendChild(n);
+      setTimeout(()=>n.remove(),8000);
     }
 
     function updateAllUI(){
@@ -518,6 +517,7 @@
       document.getElementById('stat-items').textContent=iCount;
       document.getElementById('stat-ar').textContent=arCount;
       document.getElementById('seed-banner').style.display=rCount>0?'none':'flex';
+
       const keys=Object.keys(allRestaurants);
       const tbody=document.getElementById('rest-list-body');
       tbody.innerHTML=!keys.length?'<tr class="empty-row"><td colspan="6">No restaurants yet</td></tr>':
@@ -536,6 +536,7 @@
             </td>
           </tr>`;
         }).join('');
+
       const opts='<option value="">Select restaurant…</option>'+keys.map(k=>`<option value="${k}">${allRestaurants[k].emoji||''} ${allRestaurants[k].name}</option>`).join('');
       ['menu-rest','qr-restaurant','menu-filter'].forEach(id=>{const el=document.getElementById(id);if(el){const prev=el.value;el.innerHTML=opts;if(prev)el.value=prev;}});
       filterMenu();
@@ -551,6 +552,7 @@
       document.getElementById('stat-revenue-today').textContent='PKR '+todR.toLocaleString();
     }
 
+    // ── OPEN EDIT RESTAURANT MODAL ──
     function openEditRest(key){
       const r=allRestaurants[key];
       document.getElementById('er-key').value=key;
@@ -558,36 +560,42 @@
       document.getElementById('er-emoji').value=r.emoji||'';
       document.getElementById('er-cuisine').value=r.cuisine||'Italian';
       document.getElementById('er-desc').value=r.description||'';
-      document.getElementById('er-photo').value=r.photo||'';
-      const prev=document.getElementById('er-photo-prev');if(r.photo){prev.src=r.photo;prev.style.display='block';}else prev.style.display='none';
+      document.getElementById('erp-url').value=r.photo||'';
+      const ercurr=document.getElementById('er-curr'),erimg=document.getElementById('er-curr-img');
+      if(r.photo){ercurr.style.display='flex';ercurr.style.alignItems='center';erimg.src=r.photo;}else ercurr.style.display='none';
+      document.getElementById('erp-url').value='';
       document.getElementById('er-owner').value=r.ownerName||'';
       document.getElementById('er-password').value='';
       editVibeValue=r.vibe||'';
       document.getElementById('er-vibe').value=editVibeValue;
-      document.querySelectorAll('#er-vibe-grid .vibe-pill').forEach(p=>p.classList.toggle('selected',p.dataset.vibe===editVibeValue));
+      document.querySelectorAll('#er-vibe-grid .vibe-pill').forEach(p=>{p.classList.toggle('selected',p.dataset.vibe===editVibeValue);});
+
       document.getElementById('edit-rest-modal').classList.add('open');
     }
 
     function saveRestaurant(){
-      const key=document.getElementById('er-key').value,name=document.getElementById('er-name').value.trim();
+      const key=document.getElementById('er-key').value;
+      const name=document.getElementById('er-name').value.trim();
       if(!name){showToast('Name is required');return;}
-      const updates={name,emoji:document.getElementById('er-emoji').value||'🍽️',cuisine:document.getElementById('er-cuisine').value,description:document.getElementById('er-desc').value,photo:document.getElementById('er-photo').value.trim(),ownerName:document.getElementById('er-owner').value,vibe:document.getElementById('er-vibe').value||editVibeValue};
+      const newPhoto=document.getElementById('erp-url').value;
+      const updates={name,emoji:document.getElementById('er-emoji').value||'🍽️',cuisine:document.getElementById('er-cuisine').value,description:document.getElementById('er-desc').value,ownerName:document.getElementById('er-owner').value,vibe:document.getElementById('er-vibe').value||editVibeValue};
+      if(newPhoto)updates.photo=newPhoto;
       const newPwd=document.getElementById('er-password').value;
       if(newPwd&&newPwd.length>=4)updates.ownerPassword=newPwd;
       db.ref('restaurants/'+key).update(updates).then(()=>{closeModal('edit-rest-modal');showToast('✓ Restaurant updated');});
     }
 
     function filterMenu(){
-      const rid=document.getElementById('menu-filter')?.value,tbody=document.getElementById('menu-list-body');
-      if(!rid){tbody.innerHTML='<tr class="empty-row"><td colspan="8">Select a restaurant above</td></tr>';return;}
+      const rid=document.getElementById('menu-filter')?.value;
+      const tbody=document.getElementById('menu-list-body');
+      if(!rid){tbody.innerHTML='<tr class="empty-row"><td colspan="7">Select a restaurant above</td></tr>';return;}
       const r=allRestaurants[rid],menu=r?.menu?Object.entries(r.menu):[];
-      if(!menu.length){tbody.innerHTML='<tr class="empty-row"><td colspan="8">No items yet</td></tr>';return;}
+      if(!menu.length){tbody.innerHTML='<tr class="empty-row"><td colspan="7">No items yet</td></tr>';return;}
       tbody.innerHTML=menu.map(([key,item])=>`
         <tr>
           <td><span style="margin-right:8px">${item.emoji||''}</span><strong style="color:var(--cream)">${item.name}</strong></td>
           <td>${item.photo?`<img src="${item.photo}" style="width:48px;height:36px;object-fit:cover;border-radius:3px;border:1px solid #3a3020">`:'<span style="color:#555;font-size:.75rem">No photo</span>'}</td>
           <td>${item.category||'—'}</td>
-          <td style="font-size:.75rem;color:var(--cream-dim)">${item.portionSize||'—'}</td>
           <td style="color:var(--gold)">PKR ${Number(item.price).toLocaleString()}</td>
           <td>${item.model?'<span style="color:var(--green);font-size:.75rem">✦ AR</span>':'—'}</td>
           <td style="font-size:.72rem">${item.spicy?'🌶 ':''}${item.vegetarian?'🌿 ':''}${item.isNew?'✨ ':''}${item.featured?'⭐':''}</td>
@@ -599,31 +607,46 @@
     }
 
     function openEditItem(rid,key){
-      const item=allRestaurants[rid]?.menu?.[key];if(!item)return;
-      document.getElementById('ei-rid').value=rid;document.getElementById('ei-key').value=key;
-      document.getElementById('ei-name').value=item.name||'';document.getElementById('ei-cat').value=item.category||'';
-      document.getElementById('ei-price').value=item.price||'';document.getElementById('ei-emoji').value=item.emoji||'';
-      document.getElementById('ei-size').value=item.portionSize||'';
-      document.getElementById('ei-model').value=item.model||'';document.getElementById('ei-photo').value=item.photo||'';
+      const item=allRestaurants[rid]?.menu?.[key];
+      if(!item)return;
+      document.getElementById('ei-rid').value=rid;
+      document.getElementById('ei-key').value=key;
+      document.getElementById('ei-name').value=item.name||'';
+      document.getElementById('ei-cat').value=item.category||'';
+      document.getElementById('ei-price').value=item.price||'';
+      document.getElementById('ei-emoji').value=item.emoji||'';
       document.getElementById('ei-desc').value=item.desc||'';
-      document.getElementById('ei-spicy').checked=!!item.spicy;document.getElementById('ei-veg').checked=!!item.vegetarian;
-      document.getElementById('ei-new').checked=!!item.isNew;document.getElementById('ei-featured').checked=!!item.featured;
-      const prev=document.getElementById('ei-photo-prev');if(item.photo){prev.src=item.photo;prev.style.display='block';}else prev.style.display='none';
+      document.getElementById('ei-spicy').checked=!!item.spicy;
+      document.getElementById('ei-veg').checked=!!item.vegetarian;
+      document.getElementById('ei-new').checked=!!item.isNew;
+      document.getElementById('ei-featured').checked=!!item.featured;
+      document.getElementById('eip-url').value='';
+      document.getElementById('eim-url').value='';
+      const eipCurr=document.getElementById('eip-curr'),eipImg=document.getElementById('eip-curr-img');
+      if(item.photo){eipCurr.style.display='flex';eipCurr.style.alignItems='center';eipImg.src=item.photo;}else eipCurr.style.display='none';
+      const eimCurr=document.getElementById('eim-curr');
+      if(item.model)eimCurr.style.display='block';else eimCurr.style.display='none';
       document.getElementById('edit-item-modal').classList.add('open');
     }
 
     function saveMenuItem(){
       const rid=document.getElementById('ei-rid').value,key=document.getElementById('ei-key').value;
-      const model=document.getElementById('ei-model').value.trim();
-      db.ref(`restaurants/${rid}/menu/${key}`).update({
-        name:document.getElementById('ei-name').value.trim(),category:document.getElementById('ei-cat').value||'Mains',
-        price:parseInt(document.getElementById('ei-price').value)||0,emoji:document.getElementById('ei-emoji').value||'🍽️',
-        portionSize:document.getElementById('ei-size').value.trim(),
-        model,hasAR:!!model,photo:document.getElementById('ei-photo').value.trim(),
-        desc:document.getElementById('ei-desc').value,spicy:document.getElementById('ei-spicy').checked,
-        vegetarian:document.getElementById('ei-veg').checked,isNew:document.getElementById('ei-new').checked,
+      const newPhoto=document.getElementById('eip-url').value;
+      const newModel=document.getElementById('eim-url').value;
+      const updates={
+        name:document.getElementById('ei-name').value.trim(),
+        category:document.getElementById('ei-cat').value||'Mains',
+        price:parseInt(document.getElementById('ei-price').value)||0,
+        emoji:document.getElementById('ei-emoji').value||'🍽️',
+        desc:document.getElementById('ei-desc').value,
+        spicy:document.getElementById('ei-spicy').checked,
+        vegetarian:document.getElementById('ei-veg').checked,
+        isNew:document.getElementById('ei-new').checked,
         featured:document.getElementById('ei-featured').checked
-      }).then(()=>{closeModal('edit-item-modal');showToast('✓ Item updated');filterMenu();});
+      };
+      if(newPhoto)updates.photo=newPhoto;
+      if(newModel){updates.model=newModel;updates.hasAR=true;}
+      db.ref(`restaurants/${rid}/menu/${key}`).update(updates).then(()=>{closeModal('edit-item-modal');showToast('✓ Item updated');filterMenu();});
     }
 
     function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -633,11 +656,9 @@
       if(!name){showToast('Please enter a restaurant name');return;}
       if(!password||password.length<4){showToast('Owner password must be at least 4 characters');return;}
       if(!selectedVibe){showToast('Please select a restaurant vibe');return;}
-      const photo=document.getElementById('rp-url').value||document.getElementById('rest-photo-url').value||'';
-      db.ref('restaurants').push({name,emoji:document.getElementById('rest-emoji').value||'🍽️',cuisine:document.getElementById('rest-cuisine').value,description:document.getElementById('rest-desc').value,photo,vibe:selectedVibe,ownerName:document.getElementById('rest-owner').value,ownerPassword:password})
-      .then(()=>{
-        ['rest-name','rest-emoji','rest-desc','rest-owner','rest-password','rest-photo-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-        document.getElementById('rp-url').value='';document.querySelectorAll('.vibe-grid:not(#er-vibe-grid) .vibe-pill').forEach(p=>p.classList.remove('selected'));selectedVibe='';document.getElementById('rest-vibe').value='';const prev=document.getElementById('rest-photo-prev');if(prev)prev.style.display='none';showToast('✓ Restaurant added');});
+      db.ref('restaurants').push({name,emoji:document.getElementById('rest-emoji').value||'🍽️',cuisine:document.getElementById('rest-cuisine').value,description:document.getElementById('rest-desc').value,photo:document.getElementById('rp-url').value||'',vibe:selectedVibe,ownerName:document.getElementById('rest-owner').value,ownerPassword:password})
+      .then(()=>{['rest-name','rest-emoji','rest-desc','rest-owner','rest-password'].forEach(id=>document.getElementById(id).value='');
+        document.getElementById('rp-url').value='';document.querySelectorAll('.vibe-grid:not(#er-vibe-grid) .vibe-pill').forEach(p=>p.classList.remove('selected'));selectedVibe='';document.getElementById('rest-vibe').value='';document.getElementById('rest-photo-prev').style.display='none';showToast('✓ Restaurant added');});
     }
 
     function deleteRestaurant(key,name){if(!confirm(`Delete "${name}" and all its menu items?`))return;db.ref('restaurants/'+key).remove();db.ref('orders/'+key).remove();showToast('Restaurant deleted');}
@@ -647,95 +668,30 @@
       if(!rid){showToast('Select a restaurant first');return;}
       const name=document.getElementById('item-name').value.trim();
       if(!name){showToast('Enter an item name');return;}
-      const model=document.getElementById('im-url').value||document.getElementById('item-model-url').value||'';
-      const photo=document.getElementById('ip-url').value||document.getElementById('item-photo-url').value||'';
-      const portionSize=document.getElementById('item-size').value.trim();
-      db.ref(`restaurants/${rid}/menu`).push({name,category:document.getElementById('item-cat').value||'Mains',price:parseInt(document.getElementById('item-price').value)||0,emoji:document.getElementById('item-emoji').value||'🍽️',portionSize,desc:document.getElementById('item-desc').value,photo,model,hasAR:!!model,spicy:document.getElementById('item-spicy').checked,vegetarian:document.getElementById('item-veg').checked,isNew:document.getElementById('item-new').checked,featured:document.getElementById('item-featured').checked})
-      .then(()=>{
-        ['item-name','item-cat','item-price','item-emoji','item-size','item-desc','item-photo-url','item-model-url'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-        ['ip-url','im-url'].forEach(id=>document.getElementById(id).value='');
-        ['item-spicy','item-veg','item-new','item-featured'].forEach(id=>document.getElementById(id).checked=false);
-        const prev=document.getElementById('item-photo-prev');if(prev)prev.style.display='none';
-        document.getElementById('item-model-prev').style.display='none';
-        showToast('✓ Item added to menu');
-      });
+      const model=document.getElementById('im-url').value||'',photo=document.getElementById('ip-url').value||'';
+      db.ref(`restaurants/${rid}/menu`).push({name,category:document.getElementById('item-cat').value||'Mains',price:parseInt(document.getElementById('item-price').value)||0,emoji:document.getElementById('item-emoji').value||'🍽️',desc:document.getElementById('item-desc').value,photo,model,hasAR:!!model,spicy:document.getElementById('item-spicy').checked,vegetarian:document.getElementById('item-veg').checked,isNew:document.getElementById('item-new').checked,featured:document.getElementById('item-featured').checked})
+      .then(()=>{['item-name','item-cat','item-price','item-emoji','item-desc'].forEach(id=>document.getElementById(id).value='');
+        ['ip-url','im-url'].forEach(id=>document.getElementById(id).value='');['item-spicy','item-veg','item-new','item-featured'].forEach(id=>document.getElementById(id).checked=false);document.getElementById('item-photo-prev').style.display='none';document.getElementById('item-model-prev').style.display='none';showToast('✓ Item added');});
     }
 
     function deleteMenuItem(rid,key){if(!confirm('Remove this menu item?'))return;db.ref(`restaurants/${rid}/menu/${key}`).remove().then(()=>{showToast('Item removed');filterMenu();});}
 
+    function convertModelUrl(url){
+      if(!url)return'';
+      const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);if(m1)return`https://drive.google.com/uc?export=download&id=${m1[1]}`;
+      const m2=url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);if(m2)return`https://drive.google.com/uc?export=download&id=${m2[1]}`;
+      return url;
+    }
+
     function previewModelLink(url,prevId){
-      const el=document.getElementById(prevId);if(!el||!url){if(el)el.style.display='none';return;}
+      const el=document.getElementById(prevId);if(!url){el.style.display='none';return;}
       el.style.display='block';
-      if(url.includes('drive.google.com')){el.style.cssText='display:block;margin-top:6px;padding:8px 12px;background:rgba(224,120,64,.06);border:1px solid rgba(224,120,64,.3);border-radius:3px;font-size:.74rem;color:#e07840;line-height:1.5';el.innerHTML='⚠ Google Drive links fail in AR due to CORS restrictions. Upload the .glb directly here (requires Firebase Storage), or use <a href="https://poly.pizza" target="_blank" style="color:var(--gold)">poly.pizza</a> and copy its direct download link.';}
-      else if(url.match(/\.(glb|gltf)(\?|$)/i)){el.style.cssText='display:block;margin-top:6px;padding:8px 12px;background:rgba(76,175,125,.06);border:1px solid rgba(76,175,125,.3);border-radius:3px;font-size:.74rem;color:#4caf7d';el.innerHTML='✓ Direct .glb URL — AR will work!';}
-      else{el.style.cssText='display:block;margin-top:6px;padding:8px 12px;background:rgba(191,64,64,.06);border:1px solid rgba(191,64,64,.3);border-radius:3px;font-size:.74rem;color:var(--red)';el.innerHTML='⚠ URL doesn\'t look like a .glb file. Verify this is a 3D model URL.';}
+      if(url.includes('drive.google.com')){el.style.cssText='display:block;margin-top:6px;padding:8px 12px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.3);border-radius:3px;font-size:.74rem;color:var(--gold)';el.innerHTML='⚠ Drive links may fail due to CORS. Use poly.pizza for reliable AR.';}
+      else if(url.endsWith('.glb')){el.style.cssText='display:block;margin-top:6px;padding:8px 12px;background:rgba(76,175,125,.06);border:1px solid rgba(76,175,125,.3);border-radius:3px;font-size:.74rem;color:#4caf7d';el.innerHTML='✓ Direct .glb URL — will work for AR!';}
+      else{el.style.cssText='display:block;margin-top:6px;padding:8px 12px;background:rgba(191,64,64,.06);border:1px solid rgba(191,64,64,.3);border-radius:3px;font-size:.74rem;color:var(--red)';el.innerHTML='⚠ URL doesn\'t end in .glb — verify this is a 3D model file.';}
     }
 
-    // ─── FILE UPLOAD ───
-    function doUpload(input,prefix,type){
-      if(!storage){
-        showToast('Firebase Storage not enabled — paste a URL instead');
-        document.querySelectorAll('.storage-warn').forEach(w=>w.style.display='block');
-        return;
-      }
-      const file=input.files[0];if(!file)return;
-      if(type==='image'&&!file.type.startsWith('image/')){showToast('Select an image file');return;}
-      if(type==='glb'&&!file.name.match(/\.(glb|gltf)$/i)){showToast('Select a .glb or .gltf file');return;}
-      if(type==='image'&&file.size>5*1024*1024){showToast('Image too large — max 5 MB');return;}
-      if(type==='glb'&&file.size>50*1024*1024){showToast('Model too large — max 50 MB');return;}
-      const ext=file.name.split('.').pop().toLowerCase();
-      const folder=type==='glb'?'models':'photos';
-      const path=`dishify/${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const ref=storage.ref(path);
-      const barWrap=document.getElementById(prefix+'-bar-wrap'),bar=document.getElementById(prefix+'-bar');
-      const status=document.getElementById(prefix+'-status'),ok=document.getElementById(prefix+'-ok');
-      const urlHidden=document.getElementById(prefix+'-url');
-      if(barWrap)barWrap.style.display='block';
-      if(status){status.style.display='block';status.textContent='Uploading '+file.name+'…';}
-      if(ok)ok.style.display='none';
-      const task=ref.put(file);
-      task.on('state_changed',
-        snap=>{const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);if(bar)bar.style.width=pct+'%';if(status)status.textContent=`Uploading… ${pct}%`;},
-        err=>{if(status)status.textContent='Upload failed: '+err.message;showToast('Upload failed: '+err.message);},
-        ()=>{task.snapshot.ref.getDownloadURL().then(url=>{
-          if(bar)bar.style.width='100%';
-          if(status)status.textContent='✓ '+file.name+' uploaded';
-          if(ok){ok.style.display='block';ok.textContent=type==='glb'?'✓ Model ready: '+file.name:'✓ Photo ready: '+file.name;}
-          if(urlHidden)urlHidden.value=url;
-          if(type==='image'){const thumb=document.getElementById(prefix+'-thumb');if(thumb){thumb.src=url;thumb.style.display='block';}}
-          if(type==='glb'&&prefix==='im'){previewModelLink(url,'item-model-prev');}
-          showToast('✓ Uploaded!');
-        });}
-      );
-    }
-
-    // Drag & drop
-    document.addEventListener('DOMContentLoaded',()=>{
-      document.querySelectorAll('.upload-zone').forEach(zone=>{
-        zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
-        zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
-        zone.addEventListener('drop',e=>{
-          e.preventDefault();zone.classList.remove('dragover');
-          const inp=zone.querySelector('input[type=file]');if(!inp||!e.dataTransfer.files.length)return;
-          const id=inp.id,prefix=id.replace('-file',''),type=(id==='im-file'||id==='eim-file')?'glb':'image';
-          const dt=new DataTransfer();dt.items.add(e.dataTransfer.files[0]);inp.files=dt.files;
-          doUpload(inp,prefix,type);
-        });
-      });
-    });
-
-    // ─── QR ───
-    let currentQRDataUrl='',currentQRRid='';
-    function generateQR(){
-      const rid=document.getElementById('qr-restaurant').value,box=document.getElementById('qrcode'),urlEl=document.getElementById('qr-url');
-      box.innerHTML='';currentQRDataUrl='';currentQRRid='';
-      if(!rid){urlEl.style.display='none';return;}
-      const base=window.location.href.replace('admin.html','menu.html'),url=base+'?r='+rid;
-      new QRCode(box,{text:url,width:220,height:220,colorDark:'#0e0d0a',colorLight:'#ffffff'});
-      urlEl.textContent=url;urlEl.style.display='block';
-      currentQRRid=rid;
-      setTimeout(()=>{const canvas=box.querySelector('canvas'),img=box.querySelector('img');if(canvas)currentQRDataUrl=canvas.toDataURL('image/png');else if(img)currentQRDataUrl=img.src;},350);
-    }
+    // generateQR moved to upload section above
     function downloadQR(){const canvas=document.querySelector('#qrcode canvas'),img=document.querySelector('#qrcode img');if(canvas){const a=document.createElement('a');a.download='dishify-qr.png';a.href=canvas.toDataURL();a.click();}else if(img){const a=document.createElement('a');a.download='dishify-qr.png';a.href=img.src;a.click();}}
     function copyQRUrl(){const url=document.getElementById('qr-url').textContent;if(url)navigator.clipboard.writeText(url).then(()=>showToast('URL copied!'));}
 
@@ -764,7 +720,11 @@
         const data=snap.val()||{},el=document.getElementById('inquiries-list');
         const entries=Object.values(data).reverse();
         if(!entries.length){el.innerHTML='<p style="color:var(--cream-dim)">No inquiries yet.</p>';return;}
-        el.innerHTML=entries.map(i=>`<div class="inq-card"><div class="inq-header"><div class="inq-name">${i.name||'Anonymous'}</div><div class="inq-type">${i.type||'General'}</div></div><div class="inq-meta">📧 ${i.email||'—'} · 📱 ${i.phone||'—'} · ${i.timestampStr||''}</div><div class="inq-msg">${i.message||''}</div></div>`).join('');
+        el.innerHTML=entries.map(i=>`<div class="inq-card">
+          <div class="inq-header"><div class="inq-name">${i.name||'Anonymous'}</div><div class="inq-type">${i.type||'General'}</div></div>
+          <div class="inq-meta">📧 ${i.email||'—'} &nbsp;·&nbsp; 📱 ${i.phone||'—'} &nbsp;·&nbsp; ${i.timestampStr||''}</div>
+          <div class="inq-msg">${i.message||''}</div>
+        </div>`).join('');
       });
     }
 
@@ -772,15 +732,119 @@
       showToast('Seeding sample data…');
       const rKey=db.ref('restaurants').push().key;
       const sampleMenu={
-        [db.ref().push().key]:{name:'Margherita Pizza',category:'Mains',price:950,emoji:'🍕',portionSize:'12 inch · Serves 2',photo:'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&q=80',desc:'San Marzano tomatoes, fresh mozzarella, basil on a hand-stretched crust.',model:'https://uploads.poly.pizza/m/d03fKqPIFQ/2.glb',hasAR:true,spicy:false,vegetarian:true},
-        [db.ref().push().key]:{name:'Classic Burger',category:'Mains',price:850,emoji:'🍔',portionSize:'250g · Serves 1',photo:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80',desc:'Juicy beef patty with aged cheddar, crispy lettuce, pickles and secret sauce.',model:'https://uploads.poly.pizza/m/5yFm4LPBTW/3.glb',hasAR:true,spicy:false,vegetarian:false},
-        [db.ref().push().key]:{name:'Truffle Pasta',category:'Mains',price:1200,emoji:'🍝',portionSize:'350g · Serves 1',photo:'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=80',desc:'Fresh tagliatelle with black truffle, aged parmesan and velvety cream.',model:'https://uploads.poly.pizza/m/bHlAjqP3AI/2.glb',hasAR:true,spicy:false,vegetarian:true},
-        [db.ref().push().key]:{name:'Burrata Salad',category:'Starters',price:750,emoji:'🥗',portionSize:'200g · Serves 1',photo:'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80',desc:'Creamy burrata on heirloom tomatoes, rocket, balsamic reduction.',model:'',hasAR:false,spicy:false,vegetarian:true},
-        [db.ref().push().key]:{name:'Beef Tenderloin',category:'Mains',price:2800,emoji:'🥩',portionSize:'200g + sides',photo:'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&q=80',desc:'200g prime beef tenderloin, truffle jus, seasonal vegetables, pomme purée.',model:'',hasAR:false,spicy:false,vegetarian:false},
-        [db.ref().push().key]:{name:'Tiramisu',category:'Desserts',price:650,emoji:'🍰',portionSize:'150g · Serves 1',photo:'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&q=80',desc:'Classic tiramisu with mascarpone, espresso ladyfingers, cocoa dust.',model:'',hasAR:false,spicy:false,vegetarian:true},
+        [db.ref().push().key]:{name:'Margherita Pizza',category:'Mains',price:950,emoji:'🍕',photo:'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&q=80',desc:'San Marzano tomatoes, fresh mozzarella, basil on a hand-stretched crust.',model:'https://uploads.poly.pizza/m/d03fKqPIFQ/2.glb',hasAR:true,spicy:false,vegetarian:true},
+        [db.ref().push().key]:{name:'Classic Burger',category:'Mains',price:850,emoji:'🍔',photo:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80',desc:'Juicy beef patty with aged cheddar, crispy lettuce, pickles and secret sauce.',model:'https://uploads.poly.pizza/m/5yFm4LPBTW/3.glb',hasAR:true,spicy:false,vegetarian:false},
+        [db.ref().push().key]:{name:'Truffle Pasta',category:'Mains',price:1200,emoji:'🍝',photo:'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=600&q=80',desc:'Fresh tagliatelle with black truffle, aged parmesan and velvety cream.',model:'https://uploads.poly.pizza/m/bHlAjqP3AI/2.glb',hasAR:true,spicy:false,vegetarian:true},
+        [db.ref().push().key]:{name:'Burrata Salad',category:'Starters',price:750,emoji:'🥗',photo:'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80',desc:'Creamy burrata on heirloom tomatoes, rocket, balsamic reduction.',model:'',hasAR:false,spicy:false,vegetarian:true},
+        [db.ref().push().key]:{name:'Beef Tenderloin',category:'Mains',price:2800,emoji:'🥩',photo:'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&q=80',desc:'200g prime beef tenderloin, truffle jus, seasonal vegetables, pomme purée.',model:'https://uploads.poly.pizza/m/cRbbYnYQfJ/2.glb',hasAR:true,spicy:false,vegetarian:false},
+        [db.ref().push().key]:{name:'Tiramisu',category:'Desserts',price:650,emoji:'🍰',photo:'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=600&q=80',desc:'Classic tiramisu with mascarpone, espresso ladyfingers, cocoa dust.',model:'',hasAR:false,spicy:false,vegetarian:true},
       };
       await db.ref(`restaurants/${rKey}`).set({name:'Casa Bella',emoji:'🍕',cuisine:'Italian',description:'Authentic Italian dining crafted with passion.',vibe:'elegant',ownerName:'Sample Owner',ownerPassword:'owner1234',menu:sampleMenu});
-      showToast('✓ Sample restaurant created! Owner password: owner1234');
+      showToast('✓ Sample restaurant created! Password: owner1234');
+    }
+
+    // ─── FILE UPLOAD ───
+    let currentQRDataUrl='',currentQRRid='';
+
+    function doUpload(input,prefix,type){
+      const file=input.files[0];if(!file)return;
+      if(type==='image'&&!file.type.startsWith('image/')){showToast('Select an image file');return;}
+      if(type==='glb'&&!file.name.match(/\.(glb|gltf)$/i)){showToast('Select a .glb or .gltf file');return;}
+      if(type==='image'&&file.size>5*1024*1024){showToast('Image too large — max 5 MB');return;}
+      if(type==='glb'&&file.size>50*1024*1024){showToast('Model too large — max 50 MB');return;}
+      const ext=file.name.split('.').pop().toLowerCase();
+      const folder=type==='glb'?'models':'photos';
+      const path=`dishify/${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const ref=storage.ref(path);
+      const barWrap=document.getElementById(prefix+'-bar-wrap');
+      const bar=document.getElementById(prefix+'-bar');
+      const status=document.getElementById(prefix+'-status');
+      const ok=document.getElementById(prefix+'-ok');
+      const urlHidden=document.getElementById(prefix+'-url');
+      if(barWrap)barWrap.style.display='block';
+      if(status){status.style.display='block';status.textContent='Uploading '+file.name+'…';}
+      if(ok)ok.style.display='none';
+      const task=ref.put(file);
+      task.on('state_changed',
+        snap=>{const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);if(bar)bar.style.width=pct+'%';if(status)status.textContent=`Uploading… ${pct}%`;},
+        err=>{if(status)status.textContent='Upload failed: '+err.message;showToast('Upload failed');},
+        ()=>{task.snapshot.ref.getDownloadURL().then(url=>{
+          if(bar)bar.style.width='100%';
+          if(status){status.textContent='✓ '+file.name+' uploaded';}
+          if(ok){ok.style.display='block';ok.textContent=type==='glb'?'✓ Model ready: '+file.name:'✓ Photo ready: '+file.name;}
+          if(urlHidden)urlHidden.value=url;
+          if(type==='image'){const thumb=document.getElementById(prefix+'-thumb');if(thumb){thumb.src=url;thumb.style.display='block';}}
+          showToast('✓ File uploaded!');
+        });}
+      );
+    }
+
+    // drag & drop on all upload zones
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.querySelectorAll('.upload-zone').forEach(zone=>{
+        zone.addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation();zone.classList.add('dragover');});
+        zone.addEventListener('dragleave',e=>{if(!zone.contains(e.relatedTarget))zone.classList.remove('dragover');});
+        zone.addEventListener('drop',e=>{
+          e.preventDefault();e.stopPropagation();zone.classList.remove('dragover');
+          if(!e.dataTransfer.files.length)return;
+          const inp=zone.querySelector('input[type=file]');if(!inp)return;
+          const id=inp.id;
+          const prefix=id.replace(/-file$/,'');
+          const type=(id==='im-file'||id==='eim-file')?'glb':'image';
+          try{const dt=new DataTransfer();dt.items.add(e.dataTransfer.files[0]);inp.files=dt.files;}catch(err){}
+          doUpload(inp,prefix,type);
+        });
+      });
+    });
+
+    // ─── QR AR TARGET ───
+    function generateQR(){
+      const rid=document.getElementById('qr-restaurant').value,box=document.getElementById('qrcode'),urlEl=document.getElementById('qr-url');
+      box.innerHTML='';currentQRDataUrl='';currentQRRid='';
+      const btn=document.getElementById('compile-ar-btn');if(btn)btn.disabled=true;
+      const cs=document.getElementById('compile-status');if(cs)cs.style.display='none';
+      if(!rid){urlEl.style.display='none';return;}
+      const base=window.location.href.replace('admin.html','menu.html'),url=base+'?r='+rid;
+      new QRCode(box,{text:url,width:220,height:220,colorDark:'#0e0d0a',colorLight:'#ffffff'});
+      urlEl.textContent=url;urlEl.style.display='block';
+      currentQRRid=rid;
+      setTimeout(()=>{
+        const canvas=box.querySelector('canvas'),img=box.querySelector('img');
+        if(canvas)currentQRDataUrl=canvas.toDataURL('image/png');
+        else if(img)currentQRDataUrl=img.src;
+        if(btn)btn.disabled=!currentQRDataUrl;
+      },350);
+    }
+
+    async function compileARTarget(){
+      if(!currentQRDataUrl||!currentQRRid){showToast('Generate a QR first');return;}
+      const cs=document.getElementById('compile-status'),btn=document.getElementById('compile-ar-btn');
+      btn.disabled=true;btn.textContent='Compiling…';
+      cs.style.display='block';cs.innerHTML='⏳ Loading MindAR compiler…';
+      try{
+        if(!window.MINDAR){
+          await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+        }
+        cs.innerHTML='⏳ Compiling image target (10–20 seconds)…';
+        const img=new Image();
+        await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=currentQRDataUrl;});
+        const compiler=new MINDAR.IMAGE.Compiler();
+        await compiler.compileImageTargets([img],p=>{ cs.innerHTML=`⏳ Compiling… ${Math.round(p*100)}%`; });
+        const buf=await compiler.exportData();
+        cs.innerHTML='⏳ Uploading target file…';
+        const blob=new Blob([buf]);
+        const ref=storage.ref(`dishify/targets/${currentQRRid}_qr.mind`);
+        await ref.put(blob,{contentType:'application/octet-stream'});
+        const mindUrl=await ref.getDownloadURL();
+        await db.ref(`restaurants/${currentQRRid}/arTarget`).set(mindUrl);
+        cs.innerHTML='✅ AR target compiled &amp; saved!<br><span style="color:var(--cream-dim);font-size:.76rem">Guests who tap "View in AR" and point at the physical QR will see the 3D dish appear on top of it.</span>';
+        btn.textContent='Recompile';btn.disabled=false;
+        showToast('✓ AR image target ready!');
+      }catch(e){
+        cs.innerHTML=`❌ Failed: ${e.message||e}`;
+        btn.textContent='Retry';btn.disabled=false;
+        console.error(e);
+      }
     }
 
     function showToast(msg){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),4000);}

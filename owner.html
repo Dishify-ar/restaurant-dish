@@ -11,6 +11,8 @@
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040;--amber:#e0a020}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    .cursor{width:10px;height:10px;background:var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference}
+    .cursor-ring{width:36px;height:36px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.5;transition:all .1s ease}
     body{background:var(--ink);color:var(--cream);font-family:'Outfit',sans-serif;min-height:100vh}
 
     /* ── STEP 1: RESTAURANT SELECT ── */
@@ -138,6 +140,8 @@
 <body>
 
   <!-- STEP 1: SELECT RESTAURANT -->
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
   <div id="step-select">
     <div class="select-box">
       <div class="select-logo">DISHIFY</div>
@@ -401,7 +405,7 @@
         return `<div class="order-card status-${o.status}">
           <div class="order-header">
             <div>
-              <div class="order-id">#${o.id||o._oid.slice(-6).toUpperCase()}</div>
+              <div class="order-id">#${o.id||o._oid.slice(-6).toUpperCase()} <span style="margin-left:6px;font-size:.62rem;padding:2px 8px;border-radius:2px;background:${o.orderType==='takeaway'?'rgba(96,168,255,.12)':'rgba(76,175,125,.1)'};border:1px solid ${o.orderType==='takeaway'?'rgba(96,168,255,.3)':'rgba(76,175,125,.3)'};color:${o.orderType==='takeaway'?'#60a8ff':'#4caf7d'}">${o.orderType==='takeaway'?'🥡 Takeaway':'🍽️ Dine In'}</span></div>
               <div class="order-table">${o.table||'Walk-in'}</div>
             </div>
             <div style="text-align:right">${chip}<br><span style="font-size:.68rem;color:var(--cream-dim)">${o.timestampStr||''}</span></div>
