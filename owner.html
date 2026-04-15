@@ -11,8 +11,10 @@
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040;--amber:#e0a020}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :focus-visible{outline:2px solid var(--gold,#c9a84c);outline-offset:2px}
+    :focus:not(:focus-visible){outline:none}
     .cursor{width:10px;height:10px;background:var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference}
-    .cursor-ring{width:36px;height:36px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.5;transition:all .1s ease}
+    .cursor-ring{width:36px;height:36px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.5;transition:left .08s linear,top .08s linear}
     body{background:var(--ink);color:var(--cream);font-family:'Outfit',sans-serif;min-height:100vh}
 
     /* ── STEP 1: RESTAURANT SELECT ── */
@@ -21,13 +23,13 @@
     .select-logo{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;color:var(--gold);letter-spacing:.1em;margin-bottom:6px}
     .select-sub{font-size:.68rem;letter-spacing:.4em;text-transform:uppercase;color:var(--cream-dim);margin-bottom:36px}
     .rest-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px;max-height:50vh;overflow-y:auto}
-    .rest-pick-btn{background:#13110d;border:1px solid #3a3020;border-radius:6px;padding:16px 14px;cursor:pointer;text-align:left;transition:all .25s;display:flex;align-items:center;gap:12px}
+    .rest-pick-btn{background:#13110d;border:1px solid #3a3020;border-radius:6px;padding:16px 14px;cursor:pointer;text-align:left;transition:all .16s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;gap:12px}
     .rest-pick-btn:hover{border-color:var(--gold);background:#1a1610}
     .rest-pick-btn.selected{border-color:var(--gold);background:var(--gold-dim)}
     .rest-pick-emoji{font-size:1.6rem;flex-shrink:0}
     .rest-pick-name{font-size:.88rem;font-weight:500;color:var(--cream);line-height:1.2}
     .rest-pick-cuisine{font-size:.68rem;color:var(--cream-dim);letter-spacing:.08em}
-    .select-next-btn{width:100%;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .3s;margin-top:8px}
+    .select-next-btn{width:100%;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .18s cubic-bezier(.4,0,.2,1);margin-top:8px}
     .select-next-btn:hover{background:var(--gold-light)}
     .select-next-btn:disabled{opacity:.4;cursor:not-allowed}
     .select-loading{color:var(--cream-dim);font-size:.85rem;padding:20px 0}
@@ -41,8 +43,8 @@
     .login-label{display:block;text-align:left;font-size:.68rem;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
     .login-input{width:100%;padding:14px 18px;background:#13110d;border:1px solid #3a3020;color:var(--cream);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.95rem;margin-bottom:20px;transition:border-color .2s}
     .login-input:focus{outline:none;border-color:var(--gold)}
-    .login-btn{width:100%;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .3s}
-    .login-btn:hover{background:var(--gold-light)}
+    .login-btn{width:100%;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .18s cubic-bezier(.4,0,.2,1)}
+    .login-btn:hover{background:var(--gold-light);box-shadow:0 6px 20px rgba(201,168,76,.3);transform:translateY(-1px)}
     .login-back{background:transparent;border:none;color:var(--cream-dim);font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;margin-top:14px;text-decoration:underline}
     .login-back:hover{color:var(--gold)}
     .login-err{color:var(--red);font-size:.82rem;margin-top:12px;height:20px}
@@ -57,9 +59,9 @@
     .live-badge{display:flex;align-items:center;gap:6px;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--green);padding:6px 14px;border:1px solid rgba(76,175,125,.3);border-radius:2px;background:rgba(76,175,125,.05)}
     .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s ease-in-out infinite}
     @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
-    .icon-btn{padding:8px 16px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+    .icon-btn{padding:8px 16px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1)}
     .icon-btn:hover{border-color:var(--gold);color:var(--gold)}
-    .logout-btn{padding:8px 18px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+    .logout-btn{padding:8px 18px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1)}
     .logout-btn:hover{border-color:var(--red);color:var(--red)}
 
     main{padding:40px;max-width:1400px;margin:0 auto}
@@ -68,20 +70,20 @@
 
     /* TABS (for multiple restaurants admin view — shows all) */
     .rest-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px}
-    .rest-tab{padding:10px 22px;background:var(--ink2);border:1px solid #2a2520;border-radius:3px;color:var(--cream-dim);font-size:.78rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .25s;display:flex;align-items:center;gap:8px}
+    .rest-tab{padding:10px 22px;background:var(--ink2);border:1px solid #2a2520;border-radius:3px;color:var(--cream-dim);font-size:.78rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;gap:8px}
     .rest-tab.active{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
     .rest-tab .badge-new{background:var(--red);color:white;border-radius:50%;width:18px;height:18px;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:700}
 
     /* STATS */
     .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
-    .stat{background:var(--ink2);border:1px solid #2a2520;border-radius:6px;padding:22px 24px}
+    .stat{background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:22px 24px;transition:border-color .15s ease}
     .stat-val{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:300;color:var(--gold);line-height:1}
     .stat-label{font-size:.65rem;letter-spacing:.3em;text-transform:uppercase;color:var(--cream-dim);margin-top:4px}
 
     /* ORDERS */
     .orders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
-    .order-card{background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:24px;position:relative;transition:border-color .3s;animation:cardIn .4s cubic-bezier(.16,1,.3,1) both}
-    @keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .order-card{background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:24px;position:relative;transition:border-color .18s ease;animation:cardIn .3s cubic-bezier(.16,1,.3,1) both;will-change:transform;contain:layout style}
+    @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .order-card.status-new{border-left:3px solid var(--gold)}
     .order-card.status-preparing{border-left:3px solid var(--amber)}
     .order-card.status-ready{border-left:3px solid var(--green)}
@@ -98,7 +100,7 @@
     .order-total-row span:first-child{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cream-dim)}
     .order-total-row span:last-child{font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--gold)}
     .status-btns{display:flex;gap:8px;flex-wrap:wrap}
-    .status-btn{flex:1;padding:9px 12px;border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s;min-width:80px}
+    .status-btn{flex:1;padding:9px 12px;border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-size:.7rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);min-width:80px}
     .btn-preparing{background:rgba(224,160,32,.15);border:1px solid rgba(224,160,32,.4);color:var(--amber)}
     .btn-preparing:hover{background:rgba(224,160,32,.25)}
     .btn-ready{background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.4);color:var(--green)}
@@ -123,12 +125,14 @@
     .pwd-form-input{width:100%;padding:12px 16px;background:#13110d;border:1px solid #3a3020;color:var(--cream);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.9rem;margin-bottom:16px;transition:border-color .2s}
     .pwd-form-input:focus{outline:none;border-color:var(--gold)}
     .pwd-modal-btns{display:flex;gap:10px;margin-top:6px}
-    .btn-gold{padding:12px 24px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s;flex:1}
+    .btn-gold{padding:12px 24px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);flex:1}
     .btn-gold:hover{background:var(--gold-light)}
-    .btn-cancel{padding:12px 24px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+    .btn-cancel{padding:12px 24px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.82rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1)}
     .btn-cancel:hover{border-color:var(--red);color:var(--red)}
     .pwd-err{color:var(--red);font-size:.8rem;margin-top:8px;height:18px}
 
+    *{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
     .notif-toast{position:fixed;top:90px;right:24px;background:var(--ink3);border:1px solid var(--gold);border-left:3px solid var(--gold);color:var(--cream);padding:16px 20px;border-radius:4px;font-size:.85rem;z-index:900;animation:slideLeft .4s cubic-bezier(.16,1,.3,1);max-width:300px}
     @keyframes slideLeft{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
     .toast{position:fixed;bottom:30px;right:24px;background:var(--ink3);border:1px solid var(--gold);color:var(--cream);padding:14px 20px;border-radius:4px;font-size:.85rem;z-index:900}
