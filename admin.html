@@ -172,9 +172,21 @@
         <div class="form-group"><label>Description</label><input id="er-desc" placeholder="Short tagline…"></div>
       </div>
       <div class="form-group">
-        <label>Restaurant Photo URL <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">(replaces cuisine default)</span></label>
-        <input id="er-photo" placeholder="https://images.unsplash.com/… or any public image URL" oninput="prevImg('er-photo','er-photo-prev')">
-        <img id="er-photo-prev" class="img-preview" alt="preview">
+        <label>Restaurant Photo <span style="text-transform:none;letter-spacing:0;color:var(--cream-dim);font-size:.7rem">— upload new to replace</span></label>
+        <div id="er-curr" class="curr-asset" style="display:none">
+          <img id="er-curr-img" src="" alt="current photo">
+          <span>Current photo</span>
+        </div>
+        <label class="upload-zone" for="erp-file" style="cursor:pointer">
+          <input type="file" id="erp-file" accept="image/*" style="display:none" onchange="doUpload(this,'erp','image')">
+          <span class="upload-zone-icon">🖼️</span>
+          <div class="upload-zone-label"><strong>Click or drag &amp; drop photo</strong>JPG, PNG, WebP · max 5 MB</div>
+        </label>
+        <div class="upload-bar-wrap" id="erp-bar-wrap"><div class="upload-bar" id="erp-bar"></div></div>
+        <div class="upload-status" id="erp-status"></div>
+        <div class="upload-ok" id="erp-ok"></div>
+        <img class="upload-thumb" id="erp-thumb" alt="">
+        <input type="hidden" id="erp-url">
       </div>
       <div class="form-group">
         <label>Vibe</label>
@@ -297,12 +309,28 @@
         <div class="card">
           <div class="card-title">📋 Quick Guide</div>
           <p style="font-size:.85rem;color:var(--cream-dim);line-height:1.8">
-            1. <strong style="color:var(--gold)">Restaurants</strong> → add name, vibe, photo URL, owner password.<br>
-            2. <strong style="color:var(--gold)">Menu Editor</strong> → add items with a dish photo URL and optional .glb AR model.<br>
+            1. <strong style="color:var(--gold)">Restaurants</strong> → add name, vibe, upload a photo, set owner password.<br>
+            2. <strong style="color:var(--gold)">Menu Editor</strong> → add items, upload a dish photo and optional .glb AR model directly.<br>
             3. <strong style="color:var(--gold)">QR Codes</strong> → generate &amp; download table QR codes.<br>
             4. Owner logs in at <strong style="color:var(--gold)">owner.html</strong> → selects restaurant → enters password → sees live orders.<br>
             5. <strong style="color:var(--gold)">Inquiries</strong> → view messages from the contact form.
           </p>
+        </div>
+        <div class="card" style="border-color:rgba(191,64,64,.3);background:rgba(191,64,64,.04)">
+          <div class="card-title" style="color:#e07070">⚠️ Firebase Storage Setup Required for Uploads</div>
+          <p style="font-size:.83rem;color:var(--cream-dim);line-height:1.85">
+            Photo and 3D model uploads will <strong style="color:#e07070">fail silently</strong> until you set Firebase Storage rules to allow writes.<br>
+            Go to your <strong style="color:var(--gold)">Firebase Console → Storage → Rules</strong> and paste:
+          </p>
+          <pre style="background:#0d0b08;border:1px solid #3a3020;border-radius:4px;padding:12px 16px;font-size:.78rem;color:#4caf7d;margin-top:10px;overflow-x:auto;line-height:1.7">rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+          <p style="font-size:.76rem;color:#888;margin-top:8px;line-height:1.6">⚠ This allows public access. For production, restrict writes to authenticated admin users.</p>
         </div>
       </div>
 
@@ -578,7 +606,6 @@
       document.getElementById('er-emoji').value=r.emoji||'';
       document.getElementById('er-cuisine').value=r.cuisine||'Italian';
       document.getElementById('er-desc').value=r.description||'';
-      document.getElementById('erp-url').value=r.photo||'';
       const ercurr=document.getElementById('er-curr'),erimg=document.getElementById('er-curr-img');
       if(r.photo){ercurr.style.display='flex';ercurr.style.alignItems='center';erimg.src=r.photo;}else ercurr.style.display='none';
       document.getElementById('erp-url').value='';
@@ -689,7 +716,10 @@
       const model=document.getElementById('im-url').value||'',photo=document.getElementById('ip-url').value||'';
       db.ref(`restaurants/${rid}/menu`).push({name,category:document.getElementById('item-cat').value||'Mains',price:parseInt(document.getElementById('item-price').value)||0,emoji:document.getElementById('item-emoji').value||'🍽️',desc:document.getElementById('item-desc').value,photo,model,hasAR:!!model,spicy:document.getElementById('item-spicy').checked,vegetarian:document.getElementById('item-veg').checked,isNew:document.getElementById('item-new').checked,featured:document.getElementById('item-featured').checked})
       .then(()=>{['item-name','item-cat','item-price','item-emoji','item-desc'].forEach(id=>document.getElementById(id).value='');
-        ['ip-url','im-url'].forEach(id=>document.getElementById(id).value='');['item-spicy','item-veg','item-new','item-featured'].forEach(id=>document.getElementById(id).checked=false);document.getElementById('item-photo-prev').style.display='none';document.getElementById('item-model-prev').style.display='none';showToast('✓ Item added');});
+        ['ip-url','im-url'].forEach(id=>document.getElementById(id).value='');['item-spicy','item-veg','item-new','item-featured'].forEach(id=>document.getElementById(id).checked=false);['ip-ok','im-ok','ip-status','im-status'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+        ['ip-bar-wrap','im-bar-wrap'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+        const t=document.getElementById('ip-thumb');if(t){t.style.display='none';t.src='';}
+        showToast('✓ Item added');});
     }
 
     function deleteMenuItem(rid,key){if(!confirm('Remove this menu item?'))return;db.ref(`restaurants/${rid}/menu/${key}`).remove().then(()=>{showToast('Item removed');filterMenu();});}

@@ -58,29 +58,29 @@
     .cat-title{font-family:var(--font-display);font-size:1.9rem;font-weight:400;color:var(--primary);margin-bottom:4px}
     .cat-divider{width:36px;height:1px;background:var(--primary);opacity:.5;margin-bottom:24px}
 
-    /* ITEM CARDS — hover reveals description, only + button adds to cart */
-    .item-card{display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;position:relative}
-    .item-card:hover{border-color:var(--border2);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+    /* ITEM CARDS */
+    .item-card{display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;transition:border-color .18s ease,box-shadow .18s ease,transform .15s ease;position:relative}
+    .item-card:hover{border-color:var(--border2);box-shadow:0 8px 32px rgba(0,0,0,.35)}
     html[data-vibe="modern"] .item-card:hover{border-color:var(--primary);box-shadow:0 0 20px var(--primary-dim)}
     html[data-vibe="playful"] .item-card:hover{transform:translateY(-3px) rotate(.3deg)}
 
     /* Dish photo */
-    .item-photo{width:110px;flex-shrink:0;position:relative;overflow:hidden;background:var(--bg3)}
-    .item-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s cubic-bezier(.4,0,.2,1),filter .25s ease;filter:brightness(.85) saturate(.92);will-change:transform}
-    .item-card:hover .item-photo img{transform:scale(1.05);filter:brightness(.98) saturate(1.05)}
-    .item-photo-placeholder{width:110px;flex-shrink:0;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:2.4rem}
+    .item-photo{width:140px;flex-shrink:0;position:relative;overflow:hidden;background:var(--bg3)}
+    .item-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s cubic-bezier(.4,0,.2,1),filter .25s ease;filter:brightness(.88) saturate(.95);will-change:transform}
+    .item-card:hover .item-photo img{transform:scale(1.06);filter:brightness(1) saturate(1.08)}
+    .item-photo-placeholder{width:140px;flex-shrink:0;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:2.8rem;min-height:110px}
 
     /* Main content */
     .item-body{flex:1;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
     .item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
-    .item-name{font-family:var(--font-display);font-size:1.15rem;font-weight:400;color:var(--text);line-height:1.2}
+    .item-name{font-family:var(--font-display);font-size:1.18rem;font-weight:400;color:var(--text);line-height:1.2}
     .item-price{font-family:var(--font-display);font-size:1.2rem;color:var(--primary);font-weight:400;white-space:nowrap}
 
-    /* Description — hidden by default, shown on hover */
-    .item-desc{font-size:.8rem;color:var(--text-dim);line-height:1.6;max-height:0;overflow:hidden;transition:max-height .22s cubic-bezier(.4,0,.2,1),opacity .18s ease,margin .18s ease;opacity:0;margin:0}
-    .item-card:hover .item-desc{max-height:100px;opacity:1;margin:4px 0 8px}
+    /* Description — always visible, subtle */
+    .item-desc{font-size:.8rem;color:var(--text-dim);line-height:1.65;margin:4px 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .item-card:hover .item-desc{-webkit-line-clamp:4}
 
-    .item-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
+    .item-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
     .item-badges{display:flex;gap:5px;flex-wrap:wrap}
     .badge{font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;padding:2px 8px;border-radius:2px;border:1px solid}
     .badge-ar{color:#4caf7d;border-color:rgba(76,175,125,.3);background:rgba(76,175,125,.05)}
@@ -183,7 +183,7 @@
     .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;gap:18px;color:var(--text-dim)}
     .loading-ring{width:44px;height:44px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @media(max-width:600px){nav{padding:0 18px}#r-name{font-size:2.2rem}.menu-content{padding:30px 18px}.item-photo,.item-photo-placeholder{width:80px}}
+    @media(max-width:600px){nav{padding:0 18px}#r-name{font-size:2.2rem}.menu-content{padding:30px 18px}.item-photo,.item-photo-placeholder{width:100px}}
   </style>
 </head>
 <body>
@@ -239,6 +239,10 @@
       <div class="order-items" id="order-items-desk" style="display:none"></div>
       <div id="order-footer-desk" style="display:none">
         <div class="order-total"><span>Total</span><span id="order-total-desk">PKR 0</span></div>
+        <div style="margin-top:12px">
+          <label style="display:block;font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--primary);margin-bottom:5px">Special Requests <span style="color:var(--text-dim);font-size:.6rem;letter-spacing:0;text-transform:none">(optional)</span></label>
+          <textarea id="special-req-desk" placeholder="Allergies, no onions, extra sauce…" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);color:var(--text);border-radius:var(--radius);font-family:var(--font-body);font-size:.82rem;resize:none;height:62px;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+        </div>
         <button class="place-order-btn" onclick="confirmOrder()">Review & Place Order</button>
       </div>
     </div>
@@ -280,6 +284,10 @@
           <span style="font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim)">Total</span>
           <span id="order-total-mob" style="font-family:var(--font-display);font-size:1.3rem;color:var(--primary)">PKR 0</span>
         </div>
+        <div style="margin-top:12px">
+          <label style="display:block;font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--primary);margin-bottom:5px">Special Requests <span style="color:var(--text-dim);font-size:.6rem;letter-spacing:0;text-transform:none">(optional)</span></label>
+          <textarea id="special-req-mob" placeholder="Allergies, no onions, extra sauce…" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border2);color:var(--text);border-radius:var(--radius);font-family:var(--font-body);font-size:.82rem;resize:none;height:62px;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+        </div>
         <button class="place-order-btn" onclick="confirmOrder()">Review & Place Order</button>
       </div>
     </div>
@@ -292,6 +300,7 @@
       <div class="confirm-sub">You're ordering at the table below. Orders placed from outside the restaurant will not be fulfilled.</div>
       <div class="confirm-table" id="confirm-table-display">—</div>
       <div class="confirm-items" id="confirm-items"></div>
+      <div id="confirm-special-req" style="display:none;font-size:.78rem;color:var(--text-dim);padding:8px 10px;background:var(--primary-dim);border:1px solid rgba(201,168,76,.2);border-radius:var(--radius);margin-bottom:8px;line-height:1.5"></div>
       <div class="confirm-total"><span>Total</span><span id="confirm-total">PKR 0</span></div>
       <div class="confirm-btns">
         <button class="confirm-cancel" onclick="closeConfirm()">← Edit</button>
@@ -405,7 +414,7 @@
               <div class="item-bottom">
                 <div class="item-badges">${badges.join('')}</div>
                 <div class="item-actions">
-                  ${hasAR?`<button class="ar-btn" onclick="openItemAR('${esc(item.name)}')">🥽 AR</button>`:''}
+                  ${hasAR?`<button class="ar-btn" onclick="openAR('${mdl.replace(/'/g,"\\'")}','${esc(item.name)}')">🥽 AR</button>`:''}
                   <button class="add-btn" onclick="addToCart('${esc(item.name)}',${item.price})" title="Add to order">+</button>
                 </div>
               </div>
@@ -504,6 +513,9 @@
       const total=cart.reduce((s,i)=>s+i.price*i.qty,0);
       document.getElementById('confirm-table-display').textContent=orderType==='takeaway'?'🥡 Takeaway':(table?'📍 '+table:'Dine In');
       document.getElementById('confirm-items').innerHTML=cart.map(i=>`<div class="confirm-line"><span>${i.name} ×${i.qty}</span><span>PKR ${(i.price*i.qty).toLocaleString()}</span></div>`).join('');
+      const specialReq=(document.getElementById('special-req-desk')?.value||document.getElementById('special-req-mob')?.value||'').trim();
+      const reqEl=document.getElementById('confirm-special-req');
+      if(reqEl){if(specialReq){reqEl.style.display='block';reqEl.textContent='📝 '+specialReq;}else reqEl.style.display='none';}
       document.getElementById('confirm-total').textContent='PKR '+total.toLocaleString();
       document.getElementById('confirm-modal').classList.add('open');
     }
@@ -511,15 +523,21 @@
 
     async function placeOrder(){
       if(!cart.length)return;
-      const table=pendingTable||getTable();if(!table){closeConfirm();return;}
+      const orderType=window._pendingOrderType||getOrderType();
+      const table=pendingTable||getTable();
+      if(orderType==='dine-in'&&!table){closeConfirm();showToast('⚠ Table number required');return;}
       const total=cart.reduce((s,i)=>s+i.price*i.qty,0),orderId=Date.now().toString(36).toUpperCase();
+      const specialReq=(document.getElementById('special-req-desk')?.value||document.getElementById('special-req-mob')?.value||'').trim();
       try{
-        await db.ref('orders/'+rid).push({id:orderId,restaurantId:rid,table,items:cart.map(i=>({name:i.name,price:i.price,qty:i.qty})),total,status:'new',timestamp:Date.now(),timestampStr:new Date().toLocaleString('en-PK',{timeZone:'Asia/Karachi'})});
+        await db.ref('orders/'+rid).push({id:orderId,restaurantId:rid,table:orderType==='takeaway'?'Takeaway':table,orderType,specialRequests:specialReq||null,items:cart.map(i=>({name:i.name,price:i.price,qty:i.qty})),total,status:'new',timestamp:Date.now(),timestampStr:new Date().toLocaleString('en-PK',{timeZone:'Asia/Karachi'})});
         closeConfirm();
         document.getElementById('success-order-id').textContent='ORDER #'+orderId;
         document.getElementById('success-modal').classList.add('open');
         cart=[];updateCart();closeMobileDrawer();
-        document.getElementById('table-num-desk').value='';document.getElementById('table-num-mob').value='';pendingTable='';
+        document.getElementById('table-num-desk').value='';document.getElementById('table-num-mob').value='';
+        if(document.getElementById('special-req-desk'))document.getElementById('special-req-desk').value='';
+        if(document.getElementById('special-req-mob'))document.getElementById('special-req-mob').value='';
+        pendingTable='';window._pendingOrderType='';
       }catch(e){showToast('Failed to place order. Check your connection.');}
     }
     function closeSuccess(){document.getElementById('success-modal').classList.remove('open');}
