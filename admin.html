@@ -9,7 +9,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -396,6 +395,14 @@ service firebase.storage {
       <div class="panel" id="panel-menu">
         <div class="page-title">Menu Editor</div>
         <div class="page-subtitle">Add items with dish photos and optional AR models. Click "Edit" on any item to update it.</div>
+        <div class="info-box" style="border-color:rgba(96,168,255,.3);background:rgba(96,168,255,.05)">
+          <strong style="color:#60a8ff">☁️ Photo & Model Upload — Cloudinary Setup (Free, one-time)</strong><br>
+          1. Go to <a href="https://cloudinary.com" target="_blank" style="color:#60a8ff">cloudinary.com</a> → sign up free (no credit card needed)<br>
+          2. In Settings → Upload → Upload Presets → click <strong style="color:#60a8ff">Add upload preset</strong><br>
+          3. Set name to <code style="background:rgba(96,168,255,.1);padding:1px 6px;border-radius:2px;color:#60a8ff">dishify_unsigned</code>, Signing mode = <strong style="color:#60a8ff">Unsigned</strong>, save<br>
+          4. Copy your <strong style="color:#60a8ff">Cloud name</strong> from the dashboard and update <code style="background:rgba(96,168,255,.1);padding:1px 6px;border-radius:2px;color:#60a8ff">CLOUDINARY_CLOUD</code> in admin.html<br>
+          That's it — photos and 3D models will upload with no Firebase Storage subscription required.
+        </div>
         <div class="card">
           <div class="card-title">➕ Add Menu Item</div>
           <div class="form-group"><label>Restaurant</label><select id="menu-rest"></select></div>
@@ -505,7 +512,6 @@ service firebase.storage {
     const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
     firebase.initializeApp(firebaseConfig);
     const db=firebase.database();
-    const storage=firebase.storage();
     let allRestaurants={}, allOrders={}, selectedVibe='', editVibeValue='';
 
     function login(){
@@ -791,40 +797,70 @@ service firebase.storage {
       showToast('✓ Sample restaurant created! Password: owner1234');
     }
 
-    // ─── FILE UPLOAD ───
+    // ─── FILE UPLOAD via Cloudinary (free, no subscription needed) ───
+    // Uses unsigned upload preset — set up once at cloudinary.com (free tier)
+    const CLOUDINARY_CLOUD = 'dishify';          // ← your Cloudinary cloud name
+    const CLOUDINARY_PRESET = 'dishify_unsigned'; // ← your unsigned upload preset name
+    // HOW TO SET UP (one-time, free):
+    // 1. Go to cloudinary.com → sign up free
+    // 2. Settings → Upload → Upload presets → Add unsigned preset
+    // 3. Set preset name to "dishify_unsigned", allow all origins
+    // 4. Update CLOUDINARY_CLOUD above to your cloud name (shown on dashboard)
     let currentQRDataUrl='',currentQRRid='';
 
     function doUpload(input,prefix,type){
       const file=input.files[0];if(!file)return;
       if(type==='image'&&!file.type.startsWith('image/')){showToast('Select an image file');return;}
       if(type==='glb'&&!file.name.match(/\.(glb|gltf)$/i)){showToast('Select a .glb or .gltf file');return;}
-      if(type==='image'&&file.size>5*1024*1024){showToast('Image too large — max 5 MB');return;}
-      if(type==='glb'&&file.size>50*1024*1024){showToast('Model too large — max 50 MB');return;}
-      const ext=file.name.split('.').pop().toLowerCase();
-      const folder=type==='glb'?'models':'photos';
-      const path=`dishify/${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const ref=storage.ref(path);
+      if(type==='image'&&file.size>10*1024*1024){showToast('Image too large — max 10 MB');return;}
+      if(type==='glb'&&file.size>100*1024*1024){showToast('Model too large — max 100 MB');return;}
+
       const barWrap=document.getElementById(prefix+'-bar-wrap');
       const bar=document.getElementById(prefix+'-bar');
       const status=document.getElementById(prefix+'-status');
       const ok=document.getElementById(prefix+'-ok');
       const urlHidden=document.getElementById(prefix+'-url');
+
       if(barWrap)barWrap.style.display='block';
       if(status){status.style.display='block';status.textContent='Uploading '+file.name+'…';}
       if(ok)ok.style.display='none';
-      const task=ref.put(file);
-      task.on('state_changed',
-        snap=>{const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);if(bar)bar.style.width=pct+'%';if(status)status.textContent=`Uploading… ${pct}%`;},
-        err=>{if(status)status.textContent='Upload failed: '+err.message;showToast('Upload failed');},
-        ()=>{task.snapshot.ref.getDownloadURL().then(url=>{
+      if(bar)bar.style.width='5%';
+
+      const formData=new FormData();
+      formData.append('file',file);
+      formData.append('upload_preset',CLOUDINARY_PRESET);
+      formData.append('folder',type==='glb'?'dishify/models':'dishify/photos');
+      // Use raw resource type for .glb files
+      const resourceType=type==='glb'?'raw':'image';
+      const url=`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/${resourceType}/upload`;
+
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST',url);
+      xhr.upload.addEventListener('progress',e=>{
+        if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);if(bar)bar.style.width=pct+'%';if(status)status.textContent=`Uploading… ${pct}%`;}
+      });
+      xhr.onload=()=>{
+        if(xhr.status===200){
+          const res=JSON.parse(xhr.responseText);
+          const uploadedUrl=res.secure_url;
           if(bar)bar.style.width='100%';
-          if(status){status.textContent='✓ '+file.name+' uploaded';}
+          if(status)status.textContent='✓ '+file.name+' uploaded';
           if(ok){ok.style.display='block';ok.textContent=type==='glb'?'✓ Model ready: '+file.name:'✓ Photo ready: '+file.name;}
-          if(urlHidden)urlHidden.value=url;
-          if(type==='image'){const thumb=document.getElementById(prefix+'-thumb');if(thumb){thumb.src=url;thumb.style.display='block';}}
+          if(urlHidden)urlHidden.value=uploadedUrl;
+          if(type==='image'){const thumb=document.getElementById(prefix+'-thumb');if(thumb){thumb.src=uploadedUrl;thumb.style.display='block';}}
           showToast('✓ File uploaded!');
-        });}
-      );
+        } else {
+          const err=JSON.parse(xhr.responseText||'{}');
+          if(status)status.textContent='Upload failed: '+(err.error?.message||xhr.status);
+          showToast('Upload failed — check Cloudinary setup');
+          if(bar)bar.style.width='0%';
+        }
+      };
+      xhr.onerror=()=>{
+        if(status)status.textContent='Network error during upload';
+        showToast('Network error — check connection');
+      };
+      xhr.send(formData);
     }
 
     // drag & drop on all upload zones
@@ -881,9 +917,14 @@ service firebase.storage {
         const buf=await compiler.exportData();
         cs.innerHTML='⏳ Uploading target file…';
         const blob=new Blob([buf]);
-        const ref=storage.ref(`dishify/targets/${currentQRRid}_qr.mind`);
-        await ref.put(blob,{contentType:'application/octet-stream'});
-        const mindUrl=await ref.getDownloadURL();
+        // Upload .mind file to Cloudinary as raw
+        const fd=new FormData();
+        fd.append('file',new File([blob],currentQRRid+'_qr.mind',{type:'application/octet-stream'}));
+        fd.append('upload_preset',CLOUDINARY_PRESET);
+        fd.append('folder','dishify/targets');
+        const upRes=await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/raw/upload`,{method:'POST',body:fd});
+        const upData=await upRes.json();
+        const mindUrl=upData.secure_url;
         await db.ref(`restaurants/${currentQRRid}/arTarget`).set(mindUrl);
         cs.innerHTML='✅ AR target compiled &amp; saved!<br><span style="color:var(--cream-dim);font-size:.76rem">Guests who tap "View in AR" and point at the physical QR will see the 3D dish appear on top of it.</span>';
         btn.textContent='Recompile';btn.disabled=false;

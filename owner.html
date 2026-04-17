@@ -13,8 +13,8 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :focus-visible{outline:2px solid var(--gold,#c9a84c);outline-offset:2px}
     :focus:not(:focus-visible){outline:none}
-    .cursor{width:10px;height:10px;background:var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference}
-    .cursor-ring{width:36px;height:36px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.5;transition:left .08s linear,top .08s linear}
+    .cursor{width:10px;height:10px;background:var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(0,0) translate(-50%,-50%);mix-blend-mode:difference;will-change:transform}
+    .cursor-ring{width:36px;height:36px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(0,0) translate(-50%,-50%);opacity:.5;will-change:transform;transition:none}
     body{background:var(--ink);color:var(--cream);font-family:'Outfit',sans-serif;min-height:100vh}
 
     /* ── STEP 1: RESTAURANT SELECT ── */
@@ -247,28 +247,36 @@
     let restName = '';
 
     function printReceipt(orderId, table, orderType, items, total, timeStr, specialReq, rname) {
-      const win = window.open('', '_blank', 'width=400,height=600');
+      const win = window.open('', '_blank', 'width=420,height=650,scrollbars=yes');
+      if(!win){showToast('⚠ Allow popups to print receipts');return;}
       const itemsHtml = (Array.isArray(items)?items:[]).map(i =>
-        `<tr><td style="padding:4px 0">${i.name}</td><td style="text-align:center;padding:4px 8px">×${i.qty}</td><td style="text-align:right;padding:4px 0">PKR ${(i.price*i.qty).toLocaleString()}</td></tr>`
+        `<tr><td style="padding:5px 0">${i.name}</td><td style="text-align:center;padding:5px 8px">×${i.qty}</td><td style="text-align:right;padding:5px 0">PKR ${(i.price*i.qty).toLocaleString()}</td></tr>`
       ).join('');
       win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt #${orderId}</title>
-      <style>body{font-family:'Courier New',monospace;font-size:13px;max-width:320px;margin:0 auto;padding:20px;color:#111}
-      h1{font-size:22px;text-align:center;margin:0 0 2px;letter-spacing:.1em}
-      .sub{text-align:center;font-size:11px;color:#555;margin-bottom:14px}
-      .divider{border:none;border-top:1px dashed #aaa;margin:10px 0}
-      table{width:100%;border-collapse:collapse}th{text-align:left;font-size:11px;color:#555;padding:4px 0;border-bottom:1px solid #ddd}
-      .total-row td{font-weight:bold;border-top:1px dashed #aaa;padding-top:8px}
-      .badge{display:inline-block;padding:2px 8px;border:1px solid #aaa;border-radius:2px;font-size:11px;margin-bottom:8px}
-      .special{background:#fffbea;border:1px solid #e0c84a;border-radius:3px;padding:8px 10px;font-size:11px;margin:8px 0}
-      .footer{text-align:center;font-size:10px;color:#888;margin-top:16px}
-      @media print{body{padding:0}button{display:none}}</style></head>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Courier New',monospace;font-size:13px;max-width:320px;margin:0 auto;padding:20px 16px;color:#111;background:#fff}
+        h1{font-size:20px;text-align:center;margin:0 0 2px;letter-spacing:.12em}
+        .sub{text-align:center;font-size:12px;color:#444;margin-bottom:4px}
+        .divider{border:none;border-top:1px dashed #aaa;margin:10px 0}
+        .row{display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:3px}
+        table{width:100%;border-collapse:collapse;margin:8px 0}
+        th{text-align:left;font-size:11px;color:#777;padding:4px 0;border-bottom:1px solid #ddd}
+        .total-row td{font-weight:bold;font-size:14px;border-top:1px dashed #aaa;padding-top:8px;padding-bottom:2px}
+        .badge{display:inline-block;padding:2px 10px;border:1px solid #aaa;border-radius:3px;font-size:11px;margin:6px 0}
+        .special{background:#fffbea;border:1px solid #e0c84a;border-radius:3px;padding:8px 10px;font-size:11px;margin:8px 0;line-height:1.5}
+        .footer{text-align:center;font-size:10px;color:#888;margin-top:16px;line-height:1.6}
+        .no-print-btn{width:100%;padding:12px;background:#111;color:#fff;border:none;border-radius:3px;font-size:13px;cursor:pointer;font-family:inherit;margin-top:12px;letter-spacing:.05em}
+        @media print{.no-print-btn{display:none}body{padding:4px}}
+      </style></head>
       <body>
       <h1>DISHIFY</h1>
-      <div class="sub">${rname}</div>
-      <div style="text-align:center"><span class="badge">${orderType==='takeaway'?'🥡 TAKEAWAY':'🍽️ DINE IN'}</span></div>
-      <div style="text-align:center;margin-bottom:4px"><strong>Order #${orderId}</strong></div>
-      <div style="text-align:center;font-size:11px;color:#555;margin-bottom:4px">${orderType!=='takeaway'?'Table: '+table:''}</div>
-      <div style="text-align:center;font-size:11px;color:#555;margin-bottom:10px">${timeStr}</div>
+      <div class="sub">${rname||''}</div>
+      <div style="text-align:center;margin:6px 0"><span class="badge">${orderType==='takeaway'?'🥡 TAKEAWAY':'🍽️ DINE IN'}</span></div>
+      <hr class="divider">
+      <div class="row"><span>Order #</span><span><strong>${orderId}</strong></span></div>
+      ${orderType!=='takeaway'?`<div class="row"><span>Table</span><span>${table}</span></div>`:''}
+      <div class="row"><span>Time</span><span>${timeStr||''}</span></div>
       <hr class="divider">
       <table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th></tr></thead>
       <tbody>${itemsHtml}</tbody>
@@ -277,7 +285,8 @@
       ${specialReq?`<div class="special"><strong>Special Requests:</strong><br>${specialReq}</div>`:''}
       <hr class="divider">
       <div class="footer">Thank you for dining with us!<br>Powered by Dishify</div>
-      <br><button onclick="window.print()" style="width:100%;padding:10px;background:#111;color:#fff;border:none;border-radius:3px;font-size:13px;cursor:pointer;font-family:inherit">🖨 Print Receipt</button>
+      <button class="no-print-btn" onclick="window.print()">🖨 Print Receipt</button>
+      <script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
       </body></html>`);
       win.document.close();
     }
@@ -493,6 +502,16 @@
         });
       });
     }
+
+    // Cursor — desktop only
+    (function(){
+      const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+      if(window.matchMedia('(hover:none)').matches){cur.style.display='none';ring.style.display='none';return;}
+      document.body.style.cursor='none';
+      let mx=0,my=0;
+      document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';});
+      setInterval(()=>{ring.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';},80);
+    })();
 
     function showNotif(msg) {
       const old=document.querySelector('.notif-toast'); if(old) old.remove();

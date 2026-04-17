@@ -26,8 +26,8 @@
     :focus:not(:focus-visible){outline:none}
     *{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
     @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-    .cursor{width:10px;height:10px;background:var(--primary);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:none}
-    .cursor-ring{width:36px;height:36px;border:1px solid var(--primary);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.5;transition:all .1s ease}
+    .cursor{width:10px;height:10px;background:var(--primary);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(0,0) translate(-50%,-50%);mix-blend-mode:difference;will-change:transform;transition:none}
+    .cursor-ring{width:36px;height:36px;border:1px solid var(--primary);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(0,0) translate(-50%,-50%);opacity:.5;will-change:transform;transition:none}
     body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh}
 
     nav{position:sticky;top:0;z-index:100;background:rgba(0,0,0,.85);backdrop-filter:blur(24px) saturate(1.5);border-bottom:1px solid var(--border);padding:0 40px;display:flex;align-items:center;justify-content:space-between;height:70px}
@@ -196,6 +196,15 @@
       <span>Order</span><span class="cart-count" id="cart-count">0</span>
     </button>
   </nav>
+
+  <!-- ORDER STATUS TRACKER (persists across sessions via localStorage) -->
+  <div id="order-tracker" style="display:none;position:sticky;top:70px;z-index:95;background:linear-gradient(135deg,rgba(14,13,10,.98),rgba(26,24,21,.98));border-bottom:1px solid rgba(201,168,76,.25);backdrop-filter:blur(20px)">
+    <div style="max-width:1400px;margin:0 auto;padding:10px 40px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div style="font-size:.65rem;letter-spacing:.35em;text-transform:uppercase;color:var(--primary);flex-shrink:0">Your Orders</div>
+      <div id="tracker-orders" style="display:flex;gap:10px;flex-wrap:wrap;flex:1"></div>
+      <button onclick="clearOldOrders()" style="font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;background:transparent;border:1px solid #3a3020;color:#555;padding:4px 10px;border-radius:2px;cursor:pointer;transition:all .15s" onmouseover="this.style.color='var(--primary)';this.style.borderColor='var(--primary)'" onmouseout="this.style.color='#555';this.style.borderColor='#3a3020'">Clear</button>
+    </div>
+  </div>
 
   <div class="menu-hero">
     <div class="menu-hero-bg" id="menu-hero-bg"></div>
@@ -533,6 +542,8 @@
         closeConfirm();
         document.getElementById('success-order-id').textContent='ORDER #'+orderId;
         document.getElementById('success-modal').classList.add('open');
+        // Save to localStorage for status tracking
+        saveOrderToTracker(orderId, orderType, orderType==='takeaway'?'Takeaway':(pendingTable||'Dine In'), cart.slice(), total);
         cart=[];updateCart();closeMobileDrawer();
         document.getElementById('table-num-desk').value='';document.getElementById('table-num-mob').value='';
         if(document.getElementById('special-req-desk'))document.getElementById('special-req-desk').value='';
@@ -608,9 +619,80 @@
       },400);
     }
 
-    // Cursor
+    // Cursor — desktop only
     const _cur=document.getElementById('cursor'),_ring=document.getElementById('cursorRing');
-    if(_cur&&_ring){document.addEventListener('mousemove',e=>{_cur.style.left=e.clientX+'px';_cur.style.top=e.clientY+'px';setTimeout(()=>{_ring.style.left=e.clientX+'px';_ring.style.top=e.clientY+'px';},80);});document.body.style.cursor='none';}
+    if(window.matchMedia('(hover:none)').matches){if(_cur)_cur.style.display='none';if(_ring)_ring.style.display='none';}
+    else{document.body.style.cursor='none';let mx=0,my=0;document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;if(_cur)_cur.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';});setInterval(()=>{if(_ring)_ring.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';},80);}
+
+    // ── ORDER STATUS TRACKER ──
+    const TRACKER_KEY = 'dishify_orders_v2';
+
+    function saveOrderToTracker(orderId, orderType, table, items, total) {
+      const saved = getTrackedOrders();
+      // Find the Firebase order key by orderId (search recent orders)
+      db.ref('orders/'+rid).orderByChild('id').equalTo(orderId).once('value', snap => {
+        const val = snap.val();
+        const fbKey = val ? Object.keys(val)[0] : null;
+        saved.push({ orderId, fbKey, orderType, table, total, status: 'new', ts: Date.now(), rid });
+        localStorage.setItem(TRACKER_KEY, JSON.stringify(saved));
+        renderTracker();
+        if(fbKey) watchOrderStatus(fbKey, orderId);
+      });
+    }
+
+    function getTrackedOrders() {
+      try { return JSON.parse(localStorage.getItem(TRACKER_KEY)||'[]'); } catch(e) { return []; }
+    }
+
+    function clearOldOrders() {
+      const now = Date.now();
+      // Keep only last 24h and non-done orders
+      const filtered = getTrackedOrders().filter(o => (now - o.ts) < 24*60*60*1000 && o.status !== 'done');
+      localStorage.setItem(TRACKER_KEY, JSON.stringify(filtered));
+      renderTracker();
+    }
+
+    function watchOrderStatus(fbKey, orderId) {
+      db.ref('orders/'+rid+'/'+fbKey+'/status').on('value', snap => {
+        const status = snap.val();
+        if(!status) return;
+        const saved = getTrackedOrders();
+        const idx = saved.findIndex(o => o.orderId === orderId);
+        if(idx > -1) { saved[idx].status = status; localStorage.setItem(TRACKER_KEY, JSON.stringify(saved)); }
+        renderTracker();
+      });
+    }
+
+    function renderTracker() {
+      const orders = getTrackedOrders().filter(o => o.rid === rid);
+      const tracker = document.getElementById('order-tracker');
+      const container = document.getElementById('tracker-orders');
+      if(!orders.length) { tracker.style.display='none'; return; }
+      tracker.style.display='block';
+      const statusConfig = {
+        new: { label:'Received', color:'var(--primary)', bg:'rgba(201,168,76,.1)', icon:'✦' },
+        preparing: { label:'Preparing', color:'#e0a020', bg:'rgba(224,160,32,.1)', icon:'⏳' },
+        ready: { label:'Ready!', color:'#4caf7d', bg:'rgba(76,175,125,.1)', icon:'✓' },
+        done: { label:'Complete', color:'#555', bg:'rgba(80,80,80,.1)', icon:'◻' }
+      };
+      container.innerHTML = orders.map(o => {
+        const s = statusConfig[o.status] || statusConfig.new;
+        return `<div style="display:inline-flex;align-items:center;gap:8px;padding:5px 12px;background:${s.bg};border:1px solid ${s.color};border-radius:2px;font-size:.72rem">
+          <span style="color:${s.color}">${s.icon}</span>
+          <span style="color:var(--text);font-weight:500">#${o.orderId}</span>
+          <span style="color:${s.color};font-weight:600">${s.label}</span>
+          ${o.table?`<span style="color:var(--text-dim);font-size:.65rem">· ${o.table}</span>`:''}
+        </div>`;
+      }).join('');
+      // Re-watch any that have a fbKey but no watcher (after page reload)
+      orders.forEach(o => { if(o.fbKey && o.status !== 'done') watchOrderStatus(o.fbKey, o.orderId); });
+    }
+
+    // On page load, restore and show any tracked orders from localStorage
+    (function initTracker(){
+      const orders = getTrackedOrders().filter(o => o.rid === rid);
+      if(orders.length) renderTracker();
+    })();
 
     function showToast(msg){const old=document.querySelector('.toast');if(old){old.style.opacity='0';setTimeout(()=>old.remove(),150);}const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);requestAnimationFrame(()=>{t.style.opacity='1';t.style.transform='translateX(0)';});setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},2600);}
   </script>
