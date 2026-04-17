@@ -265,10 +265,23 @@
       .then(()=>{document.getElementById('cf-success').style.display='block';btn.textContent='Sent ✓';['cf-name','cf-phone','cf-email','cf-message'].forEach(id=>document.getElementById(id).value='');document.getElementById('cf-type').value='';})
       .catch(()=>{btn.disabled=false;btn.textContent='Send Message →';alert('Failed to send. Email us directly at engineerhaadi@outlook.com');});
     }
-    const cursor=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
-    const isTouchOnly=()=>window.matchMedia('(hover:none)').matches;
-    if(isTouchOnly()){cursor.style.display='none';ring.style.display='none';document.body.style.cursor='';}
-    else{document.body.style.cursor='none';let mx=0,my=0;document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cursor.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';});setInterval(()=>{ring.style.transform='translate('+mx+'px,'+my+'px) translate(-50%,-50%)';},80);}
+    // ── CURSOR (desktop only, butter-smooth RAF loop) ──
+    (function(){
+      const isTouchOnly=window.matchMedia('(hover:none)').matches;
+      const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+      if(!cur||!ring)return;
+      if(isTouchOnly){cur.style.display='none';ring.style.display='none';return;}
+      document.body.style.cursor='none';
+      let mx=0,my=0,rx=0,ry=0;
+      document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;},{passive:true});
+      function tick(){
+        cur.style.transform=`translate(${mx}px,${my}px) translate(-50%,-50%)`;
+        rx+=(mx-rx)*.18;ry+=(my-ry)*.18;
+        ring.style.transform=`translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
   </script>
 </body>
 </html>

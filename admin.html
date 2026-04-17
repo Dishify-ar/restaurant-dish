@@ -395,14 +395,6 @@ service firebase.storage {
       <div class="panel" id="panel-menu">
         <div class="page-title">Menu Editor</div>
         <div class="page-subtitle">Add items with dish photos and optional AR models. Click "Edit" on any item to update it.</div>
-        <div class="info-box" style="border-color:rgba(96,168,255,.3);background:rgba(96,168,255,.05)">
-          <strong style="color:#60a8ff">☁️ Photo & Model Upload — Cloudinary Setup (Free, one-time)</strong><br>
-          1. Go to <a href="https://cloudinary.com" target="_blank" style="color:#60a8ff">cloudinary.com</a> → sign up free (no credit card needed)<br>
-          2. In Settings → Upload → Upload Presets → click <strong style="color:#60a8ff">Add upload preset</strong><br>
-          3. Set name to <code style="background:rgba(96,168,255,.1);padding:1px 6px;border-radius:2px;color:#60a8ff">dishify_unsigned</code>, Signing mode = <strong style="color:#60a8ff">Unsigned</strong>, save<br>
-          4. Copy your <strong style="color:#60a8ff">Cloud name</strong> from the dashboard and update <code style="background:rgba(96,168,255,.1);padding:1px 6px;border-radius:2px;color:#60a8ff">CLOUDINARY_CLOUD</code> in admin.html<br>
-          That's it — photos and 3D models will upload with no Firebase Storage subscription required.
-        </div>
         <div class="card">
           <div class="card-title">➕ Add Menu Item</div>
           <div class="form-group"><label>Restaurant</label><select id="menu-rest"></select></div>
@@ -799,13 +791,8 @@ service firebase.storage {
 
     // ─── FILE UPLOAD via Cloudinary (free, no subscription needed) ───
     // Uses unsigned upload preset — set up once at cloudinary.com (free tier)
-    const CLOUDINARY_CLOUD = 'dycl7qpfi';          // ← your Cloudinary cloud name
-    const CLOUDINARY_PRESET = 'dishify_unsigned'; // ← your unsigned upload preset name
-    // HOW TO SET UP (one-time, free):
-    // 1. Go to cloudinary.com → sign up free
-    // 2. Settings → Upload → Upload presets → Add unsigned preset
-    // 3. Set preset name to "dishify_unsigned", allow all origins
-    // 4. Update CLOUDINARY_CLOUD above to your cloud name (shown on dashboard)
+    const CLOUDINARY_CLOUD = 'dycl7qpfi';
+    const CLOUDINARY_PRESET = 'dishify_unsigned';
     let currentQRDataUrl='',currentQRRid='';
 
     function doUpload(input,prefix,type){
