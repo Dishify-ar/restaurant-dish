@@ -138,7 +138,23 @@
     .toast{position:fixed;bottom:30px;right:24px;background:var(--ink3);border:1px solid var(--gold);color:var(--cream);padding:14px 20px;border-radius:4px;font-size:.85rem;z-index:900}
 
     @media(max-width:900px){.stats-row{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:600px){header{padding:0 16px}main{padding:20px}.stats-row{grid-template-columns:1fr 1fr}.orders-grid{grid-template-columns:1fr}.rest-grid{grid-template-columns:1fr}.header-right .icon-btn{display:none}}
+    @media(max-width:600px){
+      header{padding:0 16px}
+      main{padding:20px}
+      .stats-row{grid-template-columns:1fr 1fr}
+      .orders-grid{grid-template-columns:1fr}
+      .rest-grid{grid-template-columns:1fr}
+      .header-right .icon-btn{display:none}
+      .stat-val{font-size:2rem}
+      .stat-label{font-size:.65rem}
+      .order-card{padding:16px 14px}
+      .order-id{font-size:.78rem}
+      .order-table{font-size:.78rem}
+      .order-item-line{font-size:.8rem;color:rgba(240,232,213,0.8)}
+      .order-total{font-size:.88rem}
+      .order-status{font-size:.65rem;padding:4px 9px}
+      .section-title{font-size:1.1rem}
+    }
 
     /* ── CHAT PANEL (owner side) ── */
     #chat-section{display:none}
