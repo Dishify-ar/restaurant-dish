@@ -893,8 +893,22 @@ service firebase.storage {
       btn.disabled=true;btn.textContent='Compiling…';
       cs.style.display='block';cs.innerHTML='⏳ Loading MindAR compiler…';
       try{
-        if(!window.MINDAR){
-          await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+        if(!window.MINDAR||!window.MINDAR.IMAGE){
+          cs.innerHTML='⏳ Loading MindAR compiler (first time may take 15s)…';
+          await new Promise((res,rej)=>{
+            // Load three.js first (MindAR depends on it)
+            const loadScript=src=>new Promise((r,j)=>{const s=document.createElement('script');s.src=src;s.onload=r;s.onerror=j;document.head.appendChild(s);});
+            loadScript('https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js').then(res).catch(()=>{
+              // fallback CDN
+              loadScript('https://unpkg.com/mind-ar@1.2.5/dist/mindar-image.prod.js').then(res).catch(rej);
+            });
+          });
+          // Wait for MINDAR to be available
+          await new Promise((res,rej)=>{
+            let attempts=0;
+            const check=()=>{if(window.MINDAR&&window.MINDAR.IMAGE){res();}else if(++attempts>40){rej(new Error('MindAR failed to initialize'));}else{setTimeout(check,250);}};
+            check();
+          });
         }
         cs.innerHTML='⏳ Compiling image target (10–20 seconds)…';
         const img=new Image();
