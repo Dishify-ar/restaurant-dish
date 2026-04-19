@@ -1108,10 +1108,10 @@ service firebase.storage {
       progressLabel.textContent = 'Initialising TF backend (CPU)…';
 
       // Wait for TF.js CPU backend to be ready before compiling
+      // Attempt to init TF backend with a 3 s timeout — never block compile
       try {
-        if (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE._tf) {
-          await window.MINDAR.IMAGE._tf.ready();
-        }
+        const tf = window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE._tf;
+        if (tf) await Promise.race([tf.setBackend('cpu'), new Promise(r=>setTimeout(r,3000))]);
       } catch(e) { /* continue regardless */ }
 
       btn.textContent = '⏳ Compiling…';
