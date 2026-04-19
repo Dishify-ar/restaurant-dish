@@ -11,7 +11,26 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script>window.AFRAME_DISABLE_AUTO_INIT=true;</script>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script>
+    /* ── MindAR Worker URL patch ──────────────────────────────────────────
+       GitHub Pages blocks blob: and data: URIs for Web Workers via CSP.
+       This intercepts the Worker constructor and redirects the compiler
+       worker to a real hosted file instead of a blob/data URI.
+    ──────────────────────────────────────────────────────────────────── */
+    (function(){
+      const _Worker = window.Worker;
+      const WORKER_FILE = 'mindar-compiler-worker.js'; // same folder as admin.html
+      window.Worker = function(src, opts) {
+        // MindAR creates its compiler worker from a blob: or data: URL
+        if(typeof src === 'string' && (src.startsWith('blob:') || src.startsWith('data:'))) {
+          return new _Worker(WORKER_FILE, opts);
+        }
+        return new _Worker(src, opts);
+      };
+      window.Worker.prototype = _Worker.prototype;
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image.prod.js"></script>
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
