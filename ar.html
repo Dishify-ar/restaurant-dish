@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>AR View — Dishify</title>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <style>
+    :root{--gold:#c9a84c;--ink:#070604;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,.65);--green:#4caf7d}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--ink);color:var(--cream);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100dvh;width:100dvw}
+
+    /* ── LOADING ── */
+    #loading{position:fixed;inset:0;z-index:9000;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .5s ease}
+    #loading.out{opacity:0;pointer-events:none}
+    .ld-logo{font-family:Georgia,serif;font-size:2rem;font-weight:300;color:var(--gold);letter-spacing:.2em}
+    .ld-ring{width:50px;height:50px;border:2px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #ld-msg{font-size:.76rem;letter-spacing:.22em;text-transform:uppercase;color:var(--cream-dim);text-align:center;padding:0 28px;line-height:1.65;max-width:320px}
+
+    /* ── ERROR ── */
+    #error{position:fixed;inset:0;z-index:9000;background:var(--ink);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:36px 28px;text-align:center}
+    #error.show{display:flex}
+    .err-icon{font-size:2.8rem}
+    .err-title{font-family:Georgia,serif;font-size:1.5rem;color:var(--gold)}
+    .err-msg{font-size:.84rem;color:var(--cream-dim);line-height:1.75;max-width:340px;white-space:pre-line}
+    .err-btn{margin-top:6px;padding:12px 26px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-size:.8rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;text-decoration:none;display:inline-block}
+
+    /* ── HUD ── */
+    #hud{position:fixed;inset:0;z-index:500;pointer-events:none;display:none}
+    #hud.show{display:block}
+
+    /* Back */
+    #back-btn{position:absolute;top:18px;left:18px;pointer-events:all;background:rgba(7,6,4,.82);border:1px solid rgba(201,168,76,.4);color:var(--gold);padding:10px 16px;border-radius:3px;font-size:.74rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(12px)}
+
+    /* Item pill */
+    #item-pill{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:rgba(7,6,4,.84);border:1px solid rgba(201,168,76,.35);backdrop-filter:blur(14px);border-radius:40px;padding:9px 18px;display:flex;align-items:center;gap:9px;white-space:nowrap;max-width:calc(100vw - 150px);overflow:hidden}
+    #item-emoji{font-size:1.2rem;flex-shrink:0}
+    #item-label{font-size:.78rem;font-weight:500;color:var(--cream);overflow:hidden;text-overflow:ellipsis}
+
+    /* Scan hint card — shown until target found */
+    #scan-hint{
+      position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+      background:rgba(7,6,4,.88);border:1px solid rgba(201,168,76,.3);
+      backdrop-filter:blur(16px);border-radius:16px;
+      padding:18px 22px;text-align:center;
+      max-width:calc(100vw - 48px);width:320px;
+      transition:opacity .4s ease;
+    }
+    #scan-hint.gone{opacity:0;pointer-events:none}
+    /* Miniature marker preview */
+    .hint-marker{width:64px;height:64px;margin:0 auto 10px;border:2px solid var(--gold);border-radius:6px;padding:3px;opacity:.85}
+    .hint-marker svg{display:block;width:100%;height:100%}
+    .hint-text{font-size:.76rem;color:var(--cream-dim);line-height:1.6}
+    .hint-text strong{color:var(--gold)}
+
+    /* Aiming corners — hidden once found */
+    .corners{position:absolute;top:50%;left:50%;transform:translate(-50%,-52%);width:min(68vw,260px);aspect-ratio:1;pointer-events:none}
+    .corners::before,.corners::after,.corners>span::before,.corners>span::after{content:'';position:absolute;width:24px;height:24px;border-color:var(--gold);border-style:solid;animation:pc 2s ease-in-out infinite}
+    .corners::before{top:0;left:0;border-width:2px 0 0 2px}
+    .corners::after{top:0;right:0;border-width:2px 2px 0 0}
+    .corners>span::before{bottom:0;left:0;border-width:0 0 2px 2px}
+    .corners>span::after{bottom:0;right:0;border-width:0 2px 2px 0}
+    @keyframes pc{0%,100%{opacity:.4}50%{opacity:1}}
+    #hud.found .corners{display:none}
+
+    /* Found badge */
+    #found-badge{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(76,175,125,.14);border:1px solid rgba(76,175,125,.5);backdrop-filter:blur(14px);border-radius:40px;padding:10px 24px;font-size:.75rem;font-weight:600;color:var(--green);letter-spacing:.15em;text-transform:uppercase;opacity:0;transition:opacity .4s ease;pointer-events:none;white-space:nowrap}
+    #found-badge.show{opacity:1}
+
+    a-scene{position:fixed;inset:0}
+  </style>
+</head>
+<body>
+
+  <div id="loading">
+    <div class="ld-logo">DISHIFY</div>
+    <div class="ld-ring"></div>
+    <div id="ld-msg">Starting AR…</div>
+  </div>
+
+  <div id="error">
+    <div class="err-icon">⚠️</div>
+    <div class="err-title">AR Unavailable</div>
+    <div class="err-msg" id="err-msg">Something went wrong.</div>
+    <a class="err-btn" id="err-back" href="#">← Back to Menu</a>
+  </div>
+
+  <div id="hud">
+    <button id="back-btn" onclick="goBack()">← Back</button>
+    <div id="item-pill"><span id="item-emoji">🍽️</span><span id="item-label">Loading…</span></div>
+    <div class="corners"><span></span></div>
+    <div id="scan-hint">
+      <!-- Miniature of the Dishify marker so guest knows what to point at -->
+      <div class="hint-marker">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+          <rect width="512" height="512" fill="#fff"/>
+          <rect x="20" y="20" width="472" height="472" fill="none" stroke="#000" stroke-width="20"/>
+          <rect x="40" y="40" width="90" height="90" fill="#000"/><rect x="55" y="55" width="60" height="60" fill="#fff"/><rect x="68" y="68" width="34" height="34" fill="#000"/>
+          <rect x="382" y="40" width="90" height="90" fill="#000"/><rect x="397" y="55" width="60" height="60" fill="#fff"/><rect x="410" y="68" width="34" height="34" fill="#000"/>
+          <rect x="40" y="382" width="90" height="90" fill="#000"/><rect x="55" y="397" width="60" height="60" fill="#fff"/><rect x="68" y="410" width="34" height="34" fill="#000"/>
+          <circle cx="256" cy="256" r="70" fill="#000"/><circle cx="256" cy="256" r="50" fill="#fff"/><circle cx="256" cy="256" r="30" fill="#000"/>
+          <line x1="256" y1="155" x2="256" y2="175" stroke="#000" stroke-width="10"/>
+          <line x1="256" y1="337" x2="256" y2="357" stroke="#000" stroke-width="10"/>
+          <line x1="155" y1="256" x2="175" y2="256" stroke="#000" stroke-width="10"/>
+          <line x1="337" y1="256" x2="357" y2="256" stroke="#000" stroke-width="10"/>
+          <rect x="160" y="160" width="18" height="18" fill="#000"/><rect x="196" y="160" width="18" height="18" fill="#000"/>
+          <rect x="298" y="160" width="18" height="18" fill="#000"/><rect x="334" y="160" width="18" height="18" fill="#000"/>
+          <rect x="160" y="196" width="18" height="18" fill="#000"/><rect x="334" y="196" width="18" height="18" fill="#000"/>
+          <rect x="160" y="298" width="18" height="18" fill="#000"/><rect x="334" y="298" width="18" height="18" fill="#000"/>
+          <rect x="160" y="334" width="18" height="18" fill="#000"/><rect x="196" y="334" width="18" height="18" fill="#000"/>
+          <rect x="298" y="334" width="18" height="18" fill="#000"/><rect x="334" y="334" width="18" height="18" fill="#000"/>
+        </svg>
+      </div>
+      <div class="hint-text">Point your camera at the<br><strong>Dishify marker on your table</strong><br>to see the dish appear in 3D</div>
+    </div>
+    <div id="found-badge">✦ Dish Detected</div>
+  </div>
+
+  <div id="scene-container"></div>
+
+  <script>
+    const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
+    firebase.initializeApp(firebaseConfig);
+    const db=firebase.database();
+
+    const params=new URLSearchParams(location.search);
+    const rid=params.get('r')||'';
+    const itemName=params.get('item')||'';
+    const modelParam=params.get('model')||'';
+
+    function goBack(){
+      if(document.referrer.includes('menu.html'))history.back();
+      else window.location.href='menu.html?r='+encodeURIComponent(rid);
+    }
+    document.getElementById('err-back').href='menu.html?r='+encodeURIComponent(rid);
+
+    function msg(t){document.getElementById('ld-msg').textContent=t}
+    function showError(txt){
+      document.getElementById('loading').classList.add('out');
+      document.getElementById('err-msg').textContent=txt;
+      document.getElementById('error').classList.add('show');
+    }
+    function convertModelUrl(url){
+      if(!url)return'';
+      const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);if(m1)return`https://drive.google.com/uc?export=download&id=${m1[1]}`;
+      const m2=url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);if(m2)return`https://drive.google.com/uc?export=download&id=${m2[1]}`;
+      return url;
+    }
+
+    async function init(){
+      if(!rid||!itemName){showError('Missing info. Please scan the table QR code again.');return;}
+
+      msg('Loading menu…');
+
+      // Fetch restaurant + global AR config in parallel
+      let restaurant=null, globalConfig=null;
+      try{
+        const [rSnap,cSnap]=await Promise.all([
+          db.ref('restaurants/'+rid).once('value'),
+          db.ref('config/globalMindTarget').once('value')
+        ]);
+        restaurant=rSnap.val();
+        globalConfig=cSnap.val();
+      }catch(e){
+        showError('Could not connect. Check your internet and try again.');
+        return;
+      }
+
+      if(!restaurant){showError('Restaurant not found.');return;}
+
+      // Find the menu item
+      let item=null;
+      if(restaurant.menu) item=Object.values(restaurant.menu).find(i=>i.name===itemName);
+
+      // Resolve model URL (URL param takes priority, then Firebase)
+      let glbUrl=modelParam?convertModelUrl(decodeURIComponent(modelParam)):'';
+      if(!glbUrl&&item&&item.model)glbUrl=convertModelUrl(item.model);
+      if(!glbUrl){showError(`No 3D model is set for "${itemName}".\nAsk the restaurant admin to add a .glb model for this dish.`);return;}
+
+      // ── Global .mind target (automatic — no per-restaurant setup) ──
+      const mindUrl=globalConfig&&globalConfig.url?globalConfig.url:null;
+      if(!mindUrl){
+        showError('The AR marker hasn\'t been set up yet.\n\nAsk the admin to go to Admin Panel → QR Codes → Compile & Save Global Marker.\nThis only needs to be done once.');
+        return;
+      }
+
+      // Update HUD
+      document.getElementById('item-label').textContent=itemName;
+      document.getElementById('item-emoji').textContent=item?.emoji||'🍽️';
+
+      msg('Starting camera…');
+
+      // Scale: use item.arScale if set, otherwise sensible default
+      const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
+
+      // Inject A-Frame scene
+      document.getElementById('scene-container').innerHTML=`
+        <a-scene id="ar-scene"
+          mindar-image="imageTargetSrc: ${mindUrl}; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 5; warmupTolerance: 3;"
+          color-space="sRGB"
+          renderer="colorManagement: true; physicallyCorrectLights: true;"
+          vr-mode-ui="enabled: false"
+          device-orientation-permission-ui="enabled: false">
+          <a-assets timeout="30000">
+            <a-asset-item id="dish-model" src="${glbUrl}"></a-asset-item>
+          </a-assets>
+          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+          <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
+            <!-- 3D model, sits just above the marker surface, slow spin -->
+            <a-gltf-model
+              id="dish-gltf"
+              src="#dish-model"
+              position="0 0 0.06"
+              rotation="-90 0 0"
+              scale="${arScale}"
+              animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
+            </a-gltf-model>
+            <!-- Gold glow ring anchored under the model -->
+            <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
+              position="0 0 0.002" rotation="-90 0 0" opacity="0.22"
+              material="transparent: true; side: double">
+            </a-ring>
+          </a-entity>
+        </a-scene>`;
+
+      const scene=document.getElementById('ar-scene');
+
+      scene.addEventListener('arReady',()=>{
+        document.getElementById('loading').classList.add('out');
+        document.getElementById('hud').classList.add('show');
+      },{once:true});
+
+      scene.addEventListener('arError',()=>{
+        showError('Camera could not start.\nPlease allow camera access and reload the page.');
+      },{once:true});
+
+      scene.addEventListener('loaded',()=>{
+        const target=document.getElementById('ar-target');
+        if(!target)return;
+        target.addEventListener('targetFound',()=>{
+          document.getElementById('hud').classList.add('found');
+          document.getElementById('scan-hint').classList.add('gone');
+          document.getElementById('found-badge').classList.add('show');
+        });
+        target.addEventListener('targetLost',()=>{
+          document.getElementById('hud').classList.remove('found');
+          document.getElementById('scan-hint').classList.remove('gone');
+          document.getElementById('found-badge').classList.remove('show');
+        });
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
