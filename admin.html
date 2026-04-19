@@ -491,24 +491,48 @@ service firebase.storage {
         <!-- STEP 1: Global AR Marker (one-time setup) -->
         <div class="card" style="margin-bottom:24px;border-color:rgba(201,168,76,.35)">
           <div class="card-title">🎯 Step 1 — Global AR Marker <span style="font-size:.7rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--cream-dim)">(one-time setup for all restaurants)</span></div>
-          <p style="font-size:.82rem;color:var(--cream-dim);line-height:1.75;max-width:560px;margin-bottom:18px">
-            Click <strong style="color:var(--gold)">Compile &amp; Save Global Marker</strong>. Dishify will compile its built-in AR marker image once and store it in Firebase.
-            Every restaurant shares this single marker automatically — <strong style="color:var(--gold)">no per-restaurant setup needed</strong>.
-            You only need to redo this if you change the marker image.
-          </p>
-          <div id="global-ar-status-wrap" style="display:none;margin-bottom:14px">
+
+          <div id="global-ar-status-wrap" style="display:none;margin-bottom:18px">
             <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(76,175,125,.08);border:1px solid rgba(76,175,125,.35);border-radius:4px;padding:10px 16px;font-size:.8rem;color:#4caf7d">
               ✅ Global AR marker is active
               <span id="global-ar-date" style="color:var(--cream-dim);font-size:.72rem"></span>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-            <button class="btn btn-gold" id="global-compile-btn" onclick="compileGlobalARTarget()">⚙ Compile &amp; Save Global Marker</button>
-            <span id="global-compile-status" style="font-size:.8rem;color:var(--cream-dim);line-height:1.6"></span>
+
+          <p style="font-size:.82rem;color:var(--cream-dim);line-height:1.8;max-width:580px;margin-bottom:20px">
+            <strong style="color:var(--gold)">How to set up (one time only):</strong><br>
+            1 · Download the Dishify AR marker image below<br>
+            2 · Go to <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile" target="_blank" style="color:var(--gold)">MindAR Compiler ↗</a> and upload the marker image<br>
+            3 · Click <strong style="color:var(--gold)">Export</strong> — this downloads a <code>.mind</code> file<br>
+            4 · Upload that <code>.mind</code> file to Firebase Storage or any public host<br>
+            5 · Paste the public URL below and click <strong style="color:var(--gold)">Save</strong>
+          </p>
+
+          <!-- Downloadable marker preview -->
+          <div style="margin-bottom:20px">
+            <div style="font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:10px">AR Marker Image — Download & Compile</div>
+            <div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap">
+              <canvas id="marker-canvas" width="256" height="256" style="border:3px solid var(--gold);border-radius:4px;background:#fff;flex-shrink:0"></canvas>
+              <div style="display:flex;flex-direction:column;gap:10px;justify-content:center">
+                <p style="font-size:.78rem;color:var(--cream-dim);line-height:1.7;max-width:320px">This is the Dishify AR marker. Download it, then compile it at the MindAR tool above.</p>
+                <button class="btn btn-outline" onclick="downloadMarker()">⬇ Download Marker PNG</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- .mind URL input -->
+          <div class="form-group" style="max-width:560px">
+            <label>Compiled .mind File URL <span style="color:#bf4040">*</span></label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <input id="global-mind-url" placeholder="https://your-storage.com/dishify_marker.mind" style="flex:1;min-width:220px" oninput="document.getElementById('mind-url-err').style.display='none'">
+              <button class="btn btn-gold" onclick="saveGlobalMindTarget()" style="flex-shrink:0">Save URL</button>
+            </div>
+            <div id="mind-url-err" style="display:none;font-size:.72rem;color:#bf4040;margin-top:5px"></div>
+            <div id="mind-url-ok" style="display:none;font-size:.72rem;color:#4caf7d;margin-top:5px">✅ Saved — AR is now active for all restaurants.</div>
           </div>
         </div>
 
-        <!-- STEP 2: Per-restaurant QR generation -->
+        <!-- STEP 2: Per-restaurant QR -->
         <div class="card">
           <div class="card-title">📱 Step 2 — Generate Restaurant QR Code</div>
           <div class="form-group" style="max-width:300px"><label>Select Restaurant</label><select id="qr-restaurant" onchange="generateQR()"></select></div>
@@ -519,7 +543,7 @@ service firebase.storage {
             <button class="btn btn-outline" onclick="copyQRUrl()">Copy URL</button>
           </div>
           <p style="font-size:.78rem;color:var(--cream-dim);line-height:1.7;margin-top:14px;max-width:480px">
-            Print this QR and place it on every table. Guests scan it → browse the menu → tap <em>🥽 AR</em> on any dish → point camera at the same QR → dish appears in 3D. ✨
+            Print this QR and the AR marker on your table card. Guests scan the QR → browse menu → tap 🥽 AR on a dish → point camera at the marker → dish appears in 3D. ✨
           </p>
         </div>
       </div>
@@ -939,149 +963,85 @@ service firebase.storage {
       },350);
     }
 
-    // ── GLOBAL AR MARKER (one-time, shared by all restaurants) ──
-    // Compiled from a built-in canvas-drawn marker. Stored at Firebase config/globalMindTarget.
-    // ar.html reads this — no per-restaurant setup needed.
+    // ── GLOBAL AR MARKER — draw preview canvas & handle URL save ──
 
-    // Render the marker SVG onto a canvas and return an HTMLImageElement
-    // (canvas-based avoids SVG blob cross-origin issues in some browsers)
-    async function markerToImage(size=512){
-      return new Promise((res, rej)=>{
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        // White background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, size, size);
-        // Outer border
-        ctx.strokeStyle = '#000000'; ctx.lineWidth = 20;
-        ctx.strokeRect(20, 20, 472, 472);
-        // Helper: filled rect
-        const fr=(x,y,w,h,c='#000')=>{ ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
-        // Corner finder patterns
-        fr(40,40,90,90); fr(55,55,60,60,'#fff'); fr(68,68,34,34);
-        fr(382,40,90,90); fr(397,55,60,60,'#fff'); fr(410,68,34,34);
-        fr(40,382,90,90); fr(55,397,60,60,'#fff'); fr(68,410,34,34);
-        // Centre bullseye
-        ctx.beginPath(); ctx.arc(256,256,70,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
-        ctx.beginPath(); ctx.arc(256,256,50,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
-        ctx.beginPath(); ctx.arc(256,256,30,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
-        // Tick marks
-        ctx.strokeStyle='#000'; ctx.lineWidth=10;
-        [[256,155,256,175],[256,337,256,357],[155,256,175,256],[337,256,357,256]].forEach(([x1,y1,x2,y2])=>{
-          ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-        });
-        // Inner grid dots
-        [[160,160],[196,160],[298,160],[334,160],[160,196],[334,196],
-         [160,298],[334,298],[160,334],[196,334],[298,334],[334,334]].forEach(([x,y])=>fr(x,y,18,18));
-        // Export canvas → Image
-        const img = new Image();
-        img.onload = ()=>res(img);
-        img.onerror = rej;
-        img.src = canvas.toDataURL('image/png');
+    function drawMarkerCanvas(){
+      const canvas = document.getElementById('marker-canvas');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const s = 256;
+      const fr=(x,y,w,h,c='#000')=>{ ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,s,s);
+      ctx.strokeStyle='#000'; ctx.lineWidth=10; ctx.strokeRect(10,10,236,236);
+      // Corner finders (scaled to 256)
+      fr(20,20,45,45); fr(27,27,30,30,'#fff'); fr(34,34,17,17);
+      fr(191,20,45,45); fr(198,27,30,30,'#fff'); fr(205,34,17,17);
+      fr(20,191,45,45); fr(27,198,30,30,'#fff'); fr(34,205,17,17);
+      // Centre bullseye
+      ctx.beginPath(); ctx.arc(128,128,35,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+      ctx.beginPath(); ctx.arc(128,128,25,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(128,128,15,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+      // Ticks
+      ctx.strokeStyle='#000'; ctx.lineWidth=5;
+      [[128,77,128,87],[128,169,128,179],[77,128,87,128],[169,128,179,128]].forEach(([x1,y1,x2,y2])=>{
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
       });
+      // Inner grid
+      [[80,80],[98,80],[149,80],[167,80],[80,98],[167,98],[80,149],[167,149],[80,167],[98,167],[149,167],[167,167]].forEach(([x,y])=>fr(x,y,9,9));
     }
 
-    async function loadMindARCompiler(setS){
-      if(window.MINDAR && window.MINDAR.IMAGE) return;
-      // Try primary CDN first, then fallback
-      const cdns = [
-        'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js',
-        'https://unpkg.com/mind-ar@1.2.5/dist/mindar-image.prod.js'
-      ];
-      let loaded = false;
-      for(const src of cdns){
-        if(loaded) break;
-        try{
-          setS(`⏳ Loading MindAR compiler…`);
-          await new Promise((res,rej)=>{
-            const s=document.createElement('script');
-            s.src=src; s.onload=res; s.onerror=rej;
-            document.head.appendChild(s);
-          });
-          loaded = true;
-        } catch(e){ /* try next */ }
+    function downloadMarker(){
+      const canvas = document.getElementById('marker-canvas');
+      if(!canvas){ showToast('Marker not ready'); return; }
+      const a = document.createElement('a');
+      a.download = 'dishify_ar_marker.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+
+    async function saveGlobalMindTarget(){
+      const url = document.getElementById('global-mind-url').value.trim();
+      const errEl = document.getElementById('mind-url-err');
+      const okEl = document.getElementById('mind-url-ok');
+      errEl.style.display='none'; okEl.style.display='none';
+      if(!url){
+        errEl.textContent='Please enter a URL.'; errEl.style.display='block'; return;
       }
-      if(!loaded) throw new Error('Could not load MindAR compiler. Check your internet connection.');
-      // Wait up to 30 seconds for MINDAR.IMAGE to be available
-      setS('⏳ Initialising compiler (may take up to 30s on first run)…');
-      await new Promise((res,rej)=>{
-        let n=0;
-        const check=()=>{
-          if(window.MINDAR && window.MINDAR.IMAGE){ res(); }
-          else if(++n > 120){ rej(new Error('MindAR took too long to initialise. Please retry.')); }
-          else { setTimeout(check, 250); }
-        };
-        check();
-      });
-    }
-
-    async function compileGlobalARTarget(){
-      const btn=document.getElementById('global-compile-btn');
-      const status=document.getElementById('global-compile-status');
-      btn.disabled=true; btn.textContent='Working…';
-
-      const setS=(html,color='var(--cream-dim)')=>{ status.innerHTML=html; status.style.color=color; };
-
-      try {
-        // 1. Load MindAR compiler (with fallback CDN + generous timeout)
-        await loadMindARCompiler(setS);
-
-        // 2. Render marker image via canvas (avoids SVG blob cross-origin issues)
-        setS('⏳ Rendering marker image…');
-        const markerImg = await markerToImage(512);
-
-        // 3. Compile
-        setS('⏳ Compiling image target (10–20 seconds)…');
-        const compiler = new MINDAR.IMAGE.Compiler();
-        await compiler.compileImageTargets([markerImg], p=>{
-          setS(`⏳ Compiling… ${Math.round(p*100)}%`);
-        });
-        const buf = await compiler.exportData();
-
-        // 4. Upload .mind to Cloudinary
-        setS('⏳ Uploading .mind file…');
-        const fd=new FormData();
-        fd.append('file', new File([new Blob([buf])], 'dishify_global_marker.mind', {type:'application/octet-stream'}));
-        fd.append('upload_preset', CLOUDINARY_PRESET);
-        fd.append('folder','dishify/targets');
-        const upRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/raw/upload`,{method:'POST',body:fd});
-        const upData = await upRes.json();
-        if(!upData.secure_url) throw new Error('Upload failed: ' + JSON.stringify(upData));
-        const mindUrl = upData.secure_url;
-
-        // 5. Save globally — all restaurants pick this up automatically
-        await db.ref('config/globalMindTarget').set({url: mindUrl, compiledAt: Date.now()});
-
-        setS('✅ Global AR marker saved! All restaurants are now ready.','#4caf7d');
-        btn.textContent='Recompile'; btn.disabled=false;
+      if(!url.startsWith('http')){
+        errEl.textContent='URL must start with http:// or https://'; errEl.style.display='block'; return;
+      }
+      try{
+        await db.ref('config/globalMindTarget').set({ url, compiledAt: Date.now() });
+        okEl.style.display='block';
         showGlobalARStatus();
-        showToast('✓ AR marker ready for all restaurants!');
-
-      } catch(e) {
-        setS(`❌ Failed: ${e.message||e}`,'#e05050');
-        btn.textContent='Retry'; btn.disabled=false;
-        console.error(e);
+        showToast('✓ AR marker URL saved!');
+      } catch(e){
+        errEl.textContent='Failed to save: '+(e.message||e); errEl.style.display='block';
       }
     }
 
     function showGlobalARStatus(){
       db.ref('config/globalMindTarget').once('value', snap=>{
-        const d=snap.val();
-        const wrap=document.getElementById('global-ar-status-wrap');
+        const d = snap.val();
+        const wrap = document.getElementById('global-ar-status-wrap');
         if(!wrap) return;
-        if(d&&d.url){
+        if(d && d.url){
           wrap.style.display='block';
-          const dateEl=document.getElementById('global-ar-date');
-          if(dateEl&&d.compiledAt) dateEl.textContent='· compiled '+new Date(d.compiledAt).toLocaleDateString('en-PK');
+          const dateEl = document.getElementById('global-ar-date');
+          if(dateEl && d.compiledAt) dateEl.textContent='· saved '+new Date(d.compiledAt).toLocaleDateString('en-PK');
+          // Pre-fill the input with existing URL
+          const inp = document.getElementById('global-mind-url');
+          if(inp && !inp.value) inp.value = d.url;
         } else {
           wrap.style.display='none';
         }
       });
     }
 
-    // Check on page load
-    document.addEventListener('DOMContentLoaded', showGlobalARStatus);
+    document.addEventListener('DOMContentLoaded', ()=>{
+      drawMarkerCanvas();
+      showGlobalARStatus();
+    });
 
     function showToast(msg){const old=document.querySelector('.toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),4000);}
   </script>

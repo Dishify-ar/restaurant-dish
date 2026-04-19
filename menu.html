@@ -70,31 +70,32 @@
 
     /* Main content */
     .item-body{flex:1;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between;min-width:0}
-    .item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px}
-    .item-name{font-family:var(--font-display);font-size:1.18rem;font-weight:400;color:var(--text);line-height:1.2}
-    .item-price{font-family:var(--font-display);font-size:1.2rem;color:var(--primary);font-weight:400;white-space:nowrap}
+    .item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px}
+    .item-name{font-family:var(--font-display);font-size:1.18rem;font-weight:400;color:var(--text);line-height:1.2;min-width:0;word-break:break-word}
+    .item-price{font-family:var(--font-display);font-size:1.2rem;color:var(--primary);font-weight:400;white-space:nowrap;flex-shrink:0}
 
-    /* Description — always visible, subtle */
+    /* Description */
     .item-desc{font-size:.8rem;color:var(--text-dim);line-height:1.65;margin:4px 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
     .item-card:hover .item-desc{-webkit-line-clamp:4}
 
-    .item-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
-    .item-badges{display:flex;gap:5px;flex-wrap:wrap}
-    .badge{font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;padding:2px 8px;border-radius:2px;border:1px solid}
+    /* Bottom row — badges left, actions right; wraps on very small screens */
+    .item-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;flex-wrap:wrap}
+    .item-badges{display:flex;gap:4px;flex-wrap:wrap;min-width:0}
+    .badge{font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border-radius:2px;border:1px solid;white-space:nowrap}
     .badge-ar{color:#4caf7d;border-color:rgba(76,175,125,.3);background:rgba(76,175,125,.05)}
     .badge-spicy{color:#e07840;border-color:rgba(224,120,64,.3);background:rgba(224,120,64,.05)}
     .badge-veg{color:#7db86c;border-color:rgba(125,184,108,.3);background:rgba(125,184,108,.05)}
     .badge-new{color:#60a8ff;border-color:rgba(96,168,255,.3);background:rgba(96,168,255,.05)}
 
-    /* Only the + button adds to cart — card click does nothing */
-    .item-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
-    .ar-btn{display:flex;align-items:center;gap:5px;background:transparent;border:1px solid rgba(76,175,125,.5);color:#4caf7d;padding:7px 12px;border-radius:var(--radius);font-size:.68rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);white-space:nowrap;font-family:var(--font-body)}
+    .item-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+    .ar-btn{display:flex;align-items:center;gap:4px;background:transparent;border:1px solid rgba(76,175,125,.5);color:#4caf7d;padding:6px 10px;border-radius:var(--radius);font-size:.64rem;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);white-space:nowrap;font-family:var(--font-body)}
     .ar-btn:hover{background:rgba(76,175,125,.1);border-color:#4caf7d}
-    .add-btn{width:34px;height:34px;border-radius:50%;background:var(--primary-dim);border:1px solid var(--primary);color:var(--primary);font-size:1.3rem;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .add-btn{width:32px;height:32px;border-radius:50%;background:var(--primary-dim);border:1px solid var(--primary);color:var(--primary);font-size:1.2rem;cursor:pointer;transition:all .16s cubic-bezier(.4,0,.2,1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .add-btn:hover{background:var(--primary);color:var(--bg);transform:scale(1.12)}
     .add-btn:active{transform:scale(.95)}
 
-    .featured-ribbon{position:absolute;top:10px;left:0;background:var(--primary);color:var(--bg);font-size:.58rem;font-weight:700;letter-spacing:.2em;padding:3px 10px;text-transform:uppercase;border-radius:0 2px 2px 0}
+    /* Featured ribbon — sits above photo, not overlapping text */
+    .featured-ribbon{position:absolute;top:8px;left:0;background:var(--primary);color:var(--bg);font-size:.54rem;font-weight:700;letter-spacing:.16em;padding:3px 9px;text-transform:uppercase;border-radius:0 2px 2px 0;z-index:2;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
     /* ORDER PANEL */
     .order-panel{background:var(--bg2);border-left:1px solid var(--border);padding:36px 28px;position:sticky;top:124px;height:calc(100vh - 124px);overflow-y:auto;display:flex;flex-direction:column}
@@ -181,7 +182,7 @@
     .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;gap:18px;color:var(--text-dim)}
     .loading-ring{width:44px;height:44px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @media(max-width:600px){nav{padding:0 14px;height:60px}.nav-logo{font-size:1.25rem;letter-spacing:.06em}.nav-restaurant{font-size:.62rem;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cart-btn{padding:7px 12px;font-size:.7rem;gap:5px}.cart-count{width:16px;height:16px;font-size:.62rem}.menu-hero{height:180px}.menu-hero-content{padding:18px 16px}#r-name{font-size:1.7rem}#r-cuisine{font-size:.66rem;margin-top:4px}.breadcrumb{font-size:.62rem}.cat-tabs{top:60px}.cat-tab{padding:11px 14px;font-size:.66rem;letter-spacing:.12em}.menu-content{padding:18px 12px}.cat-title{font-size:1.5rem}.item-card{margin-bottom:10px}.item-photo{width:82px}.item-photo-placeholder{width:82px;min-height:90px;font-size:2rem}.item-body{padding:10px 12px}.item-name{font-size:.95rem;line-height:1.25}.item-price{font-size:.95rem}.item-desc{font-size:.75rem;color:rgba(240,232,213,0.72);margin:3px 0 8px;-webkit-line-clamp:2}.badge{font-size:.56rem;padding:2px 7px;letter-spacing:.12em}.ar-btn{font-size:.64rem;padding:6px 9px;gap:3px}.add-btn{width:30px;height:30px;font-size:1rem}.item-bottom{gap:6px}.drawer-panel{padding:20px 16px 32px}.confirm-box{padding:28px 20px}.confirm-title{font-size:1.3rem}.confirm-sub{font-size:.78rem}.success-box{padding:36px 24px}.success-title{font-size:1.6rem}.success-sub{font-size:.8rem}#chat-panel{width:calc(100vw - 20px);right:10px;bottom:130px;max-height:380px}#chat-fab{bottom:76px;right:14px;width:46px;height:46px;font-size:1.2rem}.mobile-order-fab{bottom:16px;right:14px;padding:11px 16px;font-size:.75rem}.ar-modal-title{font-size:1rem}.ar-footer{padding:10px 14px;gap:8px}.ar-footer p{font-size:.72rem}.ar-launch-btn{font-size:.72rem;padding:9px 14px}}
+    @media(max-width:600px){nav{padding:0 18px}#r-name{font-size:2.2rem}.menu-content{padding:30px 18px}.item-photo,.item-photo-placeholder{width:100px}}
 
     /* ── CHAT ── */
     #chat-fab{position:fixed;bottom:90px;right:22px;z-index:250;width:52px;height:52px;border-radius:50%;background:var(--primary);color:var(--bg);border:none;font-size:1.4rem;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;transition:transform .18s cubic-bezier(.4,0,.2,1)}
@@ -247,25 +248,7 @@
     <!-- DESKTOP ORDER PANEL -->
     <div class="order-panel">
       <div class="panel-title">Your Order</div>
-      <!-- Order Type -->
-      <div style="margin-bottom:14px">
-        <div style="font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--primary);margin-bottom:8px">Order Type <span style="color:#bf4040">*</span></div>
-        <div style="display:flex;gap:8px">
-          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:all .2s" id="type-dine-label-desk">
-            <input type="radio" name="order-type-desk" value="dine-in" id="type-dine-desk" style="width:auto;accent-color:var(--primary)" onchange="syncOrderType('desk')">
-            <span style="font-size:.8rem;color:var(--text)">🍽️ Dine In</span>
-          </label>
-          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:all .2s" id="type-take-label-desk">
-            <input type="radio" name="order-type-desk" value="takeaway" id="type-take-desk" style="width:auto;accent-color:var(--primary)" onchange="syncOrderType('desk')">
-            <span style="font-size:.8rem;color:var(--text)">🥡 Takeaway</span>
-          </label>
-        </div>
-      </div>
-      <div class="table-input-wrap" id="table-wrap-desk">
-        <label>Table Number <span style="color:#bf4040">*</span></label>
-        <input class="table-input" type="text" id="table-num-desk" placeholder="e.g. Table 4" oninput="clearErr('desk')">
-        <div class="table-req" id="table-req-desk">⚠ Table number is required for dine-in</div>
-      </div>
+      <!-- Order type & table asked once in the confirm modal -->
       <div class="order-empty" id="order-empty-desk"><span>🍽️</span><p>Add items to your order</p></div>
       <div class="order-items" id="order-items-desk" style="display:none"></div>
       <div id="order-footer-desk" style="display:none">
@@ -289,25 +272,7 @@
     <div class="drawer-panel">
       <div class="drawer-handle"></div>
       <div class="panel-title">Your Order</div>
-      <!-- Order Type -->
-      <div style="margin-bottom:14px">
-        <div style="font-size:.65rem;letter-spacing:.25em;text-transform:uppercase;color:var(--primary);margin-bottom:8px">Order Type <span style="color:#bf4040">*</span></div>
-        <div style="display:flex;gap:8px">
-          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:all .2s">
-            <input type="radio" name="order-type-mob" value="dine-in" id="type-dine-mob" style="width:auto;accent-color:var(--primary)" onchange="syncOrderType('mob')">
-            <span style="font-size:.8rem;color:var(--text)">🍽️ Dine In</span>
-          </label>
-          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:all .2s">
-            <input type="radio" name="order-type-mob" value="takeaway" id="type-take-mob" style="width:auto;accent-color:var(--primary)" onchange="syncOrderType('mob')">
-            <span style="font-size:.8rem;color:var(--text)">🥡 Takeaway</span>
-          </label>
-        </div>
-      </div>
-      <div class="table-input-wrap" id="table-wrap-mob">
-        <label>Table Number <span style="color:#bf4040">*</span></label>
-        <input class="table-input" type="text" id="table-num-mob" placeholder="e.g. Table 4" oninput="clearErr('mob')">
-        <div class="table-req" id="table-req-mob">⚠ Table number is required for dine-in</div>
-      </div>
+      <!-- Order type & table asked once in the confirm modal -->
       <div class="order-empty" id="order-empty-mob"><span>🍽️</span><p>Add items from the menu</p></div>
       <div id="order-items-mob" style="display:none"></div>
       <div id="order-footer-mob" style="display:none">
@@ -328,8 +293,31 @@
   <div id="confirm-modal">
     <div class="confirm-box">
       <div class="confirm-title">Confirm Order</div>
-      <div class="confirm-sub">You're ordering at the table below. Orders placed from outside the restaurant will not be fulfilled.</div>
-      <div class="confirm-table" id="confirm-table-display">—</div>
+      <div class="confirm-sub">Choose how you're ordering, then confirm your items.</div>
+
+      <!-- Order Type — asked once here -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--primary);margin-bottom:8px">Order Type <span style="color:#bf4040">*</span></div>
+        <div style="display:flex;gap:8px">
+          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:border-color .2s" id="cm-dine-label">
+            <input type="radio" name="order-type-confirm" id="cm-dine" style="width:auto;accent-color:var(--primary)" onchange="cmSyncType()">
+            <span style="font-size:.8rem;color:var(--text)">🍽️ Dine In</span>
+          </label>
+          <label style="flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:border-color .2s" id="cm-take-label">
+            <input type="radio" name="order-type-confirm" id="cm-take" style="width:auto;accent-color:var(--primary)" onchange="cmSyncType()">
+            <span style="font-size:.8rem;color:var(--text)">🥡 Takeaway</span>
+          </label>
+        </div>
+        <div id="cm-type-req" style="display:none;font-size:.72rem;color:#bf4040;margin-top:5px">⚠ Please select an order type</div>
+      </div>
+
+      <!-- Table number — shown only for dine-in -->
+      <div id="cm-table-wrap" style="display:none;margin-bottom:14px">
+        <div style="font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--primary);margin-bottom:6px">Table Number <span style="color:#bf4040">*</span></div>
+        <input class="table-input" type="text" id="cm-table-num" placeholder="e.g. Table 4" oninput="document.getElementById('cm-table-req').style.display='none';this.classList.remove('err')">
+        <div id="cm-table-req" style="display:none;font-size:.72rem;color:#bf4040;margin-top:4px">⚠ Table number is required</div>
+      </div>
+
       <div class="confirm-items" id="confirm-items"></div>
       <div id="confirm-special-req" style="display:none;font-size:.78rem;color:var(--text-dim);padding:8px 10px;background:var(--primary-dim);border:1px solid rgba(201,168,76,.2);border-radius:var(--radius);margin-bottom:8px;line-height:1.5"></div>
       <div class="confirm-total"><span>Total</span><span id="confirm-total">PKR 0</span></div>
@@ -525,77 +513,78 @@
       });
     }
 
-    function syncOrderType(side){
-      const isTakeaway=document.getElementById('type-take-'+side)?.checked;
-      const wrap=document.getElementById('table-wrap-'+side);
-      // Show/hide table number based on type; sync both sides
-      const otherSide=side==='desk'?'mob':'desk';
-      ['desk','mob'].forEach(s=>{
-        const tw=document.getElementById('table-wrap-'+s);
-        if(tw)tw.style.display=isTakeaway?'none':'block';
-        const dine=document.getElementById('type-dine-'+s);
-        const take=document.getElementById('type-take-'+s);
-        if(dine&&take){dine.checked=!isTakeaway;take.checked=isTakeaway;}
-      });
+    // ── ORDER TYPE & TABLE — handled in confirm modal only ──
+    function cmSyncType(){
+      const isDine = document.getElementById('cm-dine').checked;
+      const isTake = document.getElementById('cm-take').checked;
+      document.getElementById('cm-table-wrap').style.display = isDine ? 'block' : 'none';
+      document.getElementById('cm-type-req').style.display = 'none';
+      // Highlight selected label
+      document.getElementById('cm-dine-label').style.borderColor = isDine ? 'var(--primary)' : 'var(--border2)';
+      document.getElementById('cm-take-label').style.borderColor = isTake ? 'var(--primary)' : 'var(--border2)';
     }
-
-    function getOrderType(){
-      if(document.getElementById('type-take-desk')?.checked)return'takeaway';
-      if(document.getElementById('type-take-mob')?.checked)return'takeaway';
-      if(document.getElementById('type-dine-desk')?.checked)return'dine-in';
-      if(document.getElementById('type-dine-mob')?.checked)return'dine-in';
-      return''; // not selected
-    }
-
-    function clearErr(side){
-      document.getElementById('table-num-'+side)?.classList.remove('err');
-      const e=document.getElementById('table-req-'+side);if(e)e.style.display='none';
-    }
-
-    function getTable(){return(document.getElementById('table-num-desk').value.trim()||document.getElementById('table-num-mob').value.trim());}
 
     function confirmOrder(){
       if(!cart.length){showToast('Add items first');return;}
-      const orderType=getOrderType();
-      if(!orderType){showToast('⚠ Please select Dine In or Takeaway');return;}
-      const table=orderType==='dine-in'?getTable():'';
-      if(orderType==='dine-in'&&!table){
-        ['desk','mob'].forEach(s=>{document.getElementById('table-num-'+s)?.classList.add('err');const e=document.getElementById('table-req-'+s);if(e)e.style.display='block';});
-        showToast('⚠ Enter your table number');return;
-      }
-      pendingTable=table;
-      window._pendingOrderType=orderType;
-      const total=cart.reduce((s,i)=>s+i.price*i.qty,0);
-      document.getElementById('confirm-table-display').textContent=orderType==='takeaway'?'🥡 Takeaway':(table?'📍 '+table:'Dine In');
-      document.getElementById('confirm-items').innerHTML=cart.map(i=>`<div class="confirm-line"><span>${i.name} ×${i.qty}</span><span>PKR ${(i.price*i.qty).toLocaleString()}</span></div>`).join('');
-      const specialReq=(document.getElementById('special-req-desk')?.value||document.getElementById('special-req-mob')?.value||'').trim();
-      const reqEl=document.getElementById('confirm-special-req');
-      if(reqEl){if(specialReq){reqEl.style.display='block';reqEl.textContent='📝 '+specialReq;}else reqEl.style.display='none';}
-      document.getElementById('confirm-total').textContent='PKR '+total.toLocaleString();
+      // Reset modal state
+      document.getElementById('cm-dine').checked = false;
+      document.getElementById('cm-take').checked = false;
+      document.getElementById('cm-table-wrap').style.display = 'none';
+      document.getElementById('cm-table-num').value = '';
+      document.getElementById('cm-type-req').style.display = 'none';
+      document.getElementById('cm-table-req').style.display = 'none';
+      document.getElementById('cm-dine-label').style.borderColor = 'var(--border2)';
+      document.getElementById('cm-take-label').style.borderColor = 'var(--border2)';
+      // Populate items
+      const total = cart.reduce((s,i)=>s+i.price*i.qty, 0);
+      document.getElementById('confirm-items').innerHTML = cart.map(i=>`<div class="confirm-line"><span>${i.name} ×${i.qty}</span><span>PKR ${(i.price*i.qty).toLocaleString()}</span></div>`).join('');
+      const specialReq = (document.getElementById('special-req-desk')?.value || document.getElementById('special-req-mob')?.value || '').trim();
+      const reqEl = document.getElementById('confirm-special-req');
+      if(reqEl){ if(specialReq){reqEl.style.display='block';reqEl.textContent='📝 '+specialReq;}else reqEl.style.display='none'; }
+      document.getElementById('confirm-total').textContent = 'PKR '+total.toLocaleString();
       document.getElementById('confirm-modal').classList.add('open');
     }
     function closeConfirm(){document.getElementById('confirm-modal').classList.remove('open');}
 
     async function placeOrder(){
-      if(!cart.length)return;
-      const orderType=window._pendingOrderType||getOrderType();
-      const table=pendingTable||getTable();
-      if(orderType==='dine-in'&&!table){closeConfirm();showToast('⚠ Table number required');return;}
-      const total=cart.reduce((s,i)=>s+i.price*i.qty,0),orderId=Date.now().toString(36).toUpperCase();
-      const specialReq=(document.getElementById('special-req-desk')?.value||document.getElementById('special-req-mob')?.value||'').trim();
+      if(!cart.length) return;
+      // Validate order type
+      const isDine = document.getElementById('cm-dine').checked;
+      const isTake = document.getElementById('cm-take').checked;
+      if(!isDine && !isTake){
+        document.getElementById('cm-type-req').style.display = 'block';
+        return;
+      }
+      const orderType = isDine ? 'dine-in' : 'takeaway';
+      let table = '';
+      if(isDine){
+        table = document.getElementById('cm-table-num').value.trim();
+        if(!table){
+          document.getElementById('cm-table-num').classList.add('err');
+          document.getElementById('cm-table-req').style.display = 'block';
+          return;
+        }
+      }
+      const total = cart.reduce((s,i)=>s+i.price*i.qty, 0);
+      const orderId = Date.now().toString(36).toUpperCase();
+      const specialReq = (document.getElementById('special-req-desk')?.value || document.getElementById('special-req-mob')?.value || '').trim();
       try{
-        await db.ref('orders/'+rid).push({id:orderId,restaurantId:rid,table:orderType==='takeaway'?'Takeaway':table,orderType,specialRequests:specialReq||null,items:cart.map(i=>({name:i.name,price:i.price,qty:i.qty})),total,status:'new',timestamp:Date.now(),timestampStr:new Date().toLocaleString('en-PK',{timeZone:'Asia/Karachi'})});
+        await db.ref('orders/'+rid).push({
+          id:orderId, restaurantId:rid,
+          table: isTake ? 'Takeaway' : table,
+          orderType, specialRequests:specialReq||null,
+          items:cart.map(i=>({name:i.name,price:i.price,qty:i.qty})),
+          total, status:'new', timestamp:Date.now(),
+          timestampStr:new Date().toLocaleString('en-PK',{timeZone:'Asia/Karachi'})
+        });
         closeConfirm();
-        document.getElementById('success-order-id').textContent='ORDER #'+orderId;
+        document.getElementById('success-order-id').textContent = 'ORDER #'+orderId;
         document.getElementById('success-modal').classList.add('open');
-        // Save to localStorage for status tracking
-        saveOrderToTracker(orderId, orderType, orderType==='takeaway'?'Takeaway':(pendingTable||'Dine In'), cart.slice(), total);
-        cart=[];updateCart();closeMobileDrawer();
-        document.getElementById('table-num-desk').value='';document.getElementById('table-num-mob').value='';
-        if(document.getElementById('special-req-desk'))document.getElementById('special-req-desk').value='';
-        if(document.getElementById('special-req-mob'))document.getElementById('special-req-mob').value='';
-        pendingTable='';window._pendingOrderType='';
-      }catch(e){showToast('Failed to place order. Check your connection.');}
+        saveOrderToTracker(orderId, orderType, isTake?'Takeaway':table, cart.slice(), total);
+        cart=[]; updateCart(); closeMobileDrawer();
+        if(document.getElementById('special-req-desk')) document.getElementById('special-req-desk').value='';
+        if(document.getElementById('special-req-mob')) document.getElementById('special-req-mob').value='';
+      }catch(e){ showToast('Failed to place order. Check your connection.'); }
     }
     function closeSuccess(){document.getElementById('success-modal').classList.remove('open');}
 
