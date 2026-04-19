@@ -138,11 +138,16 @@
     document.getElementById('err-back').href='menu.html?r='+encodeURIComponent(rid);
 
     function msg(t){document.getElementById('ld-msg').textContent=t}
+
     function showError(txt){
-      document.getElementById('loading').classList.add('out');
+      // FIX 1: Dismiss loading screen before showing error
+      const loadEl=document.getElementById('loading');
+      loadEl.classList.add('out');
+      setTimeout(()=>{loadEl.style.display='none';},520);
       document.getElementById('err-msg').textContent=txt;
       document.getElementById('error').classList.add('show');
     }
+
     function convertModelUrl(url){
       if(!url)return'';
       const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);if(m1)return`https://drive.google.com/uc?export=download&id=${m1[1]}`;
@@ -196,16 +201,18 @@
       // Scale: use item.arScale if set, otherwise sensible default
       const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
 
-      // Inject A-Frame scene
+      // FIX 2: Removed deprecated missTolerance and warmupTolerance params (removed in MindAR v1.2.3+).
+      // FIX 3: Raised filterMinCF from 0.001 to 0.01 — the lower value caused jitter and tracking stalls.
+      // FIX 4: Added crossorigin="anonymous" to a-asset-item to allow loading external GLB URLs (e.g. Google Drive).
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
-          mindar-image="imageTargetSrc: ${mindUrl}; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 5; warmupTolerance: 3;"
+          mindar-image="imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true;"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
           <a-assets timeout="30000">
-            <a-asset-item id="dish-model" src="${glbUrl}"></a-asset-item>
+            <a-asset-item id="dish-model" src="${glbUrl}" crossorigin="anonymous"></a-asset-item>
           </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
           <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
@@ -228,14 +235,21 @@
 
       const scene=document.getElementById('ar-scene');
 
-      scene.addEventListener('arReady',()=>{
+      // FIX 5: Guard arReady/arError with a flag so only one fires and
+      //         both clear the loading screen correctly.
+      let arStarted=false;
+      function onArReady(){
+        if(arStarted)return; arStarted=true;
         document.getElementById('loading').classList.add('out');
         document.getElementById('hud').classList.add('show');
-      },{once:true});
-
-      scene.addEventListener('arError',()=>{
+      }
+      function onArError(){
+        if(arStarted)return; arStarted=true;
         showError('Camera could not start.\nPlease allow camera access and reload the page.');
-      },{once:true});
+      }
+
+      scene.addEventListener('arReady', onArReady, {once:true});
+      scene.addEventListener('arError', onArError, {once:true});
 
       scene.addEventListener('loaded',()=>{
         const target=document.getElementById('ar-target');
