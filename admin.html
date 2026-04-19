@@ -1120,7 +1120,30 @@ service firebase.storage {
       try {
         const compiler = new CompilerClass();
 
-        await compiler.compileImageTargets([_markerImageEl], (progress) => {
+        // FIX: Build the image input from the canvas directly.
+        // mindar-image-patched.js expects either an HTMLImageElement that is
+        // fully decoded OR a plain object {data, width, height} with raw RGBA
+        // pixels. Passing _markerImageEl (an <img>) works in the CDN build but
+        // hangs in the patched local build because it tries getImageData() on
+        // a cross-origin-tainted source. Reading pixels straight from the
+        // canvas avoids the taint entirely.
+        const markerCanvas = document.getElementById('marker-canvas');
+        const markerCtx = markerCanvas.getContext('2d');
+
+        // If a custom marker was uploaded, redraw it onto the canvas first
+        if (_markerImageEl && _markerImageEl.dataset.source === 'custom') {
+          markerCtx.clearRect(0, 0, 256, 256);
+          markerCtx.fillStyle = '#fff';
+          markerCtx.fillRect(0, 0, 256, 256);
+          const s = Math.min(256 / _markerImageEl.width, 256 / _markerImageEl.height);
+          const w = _markerImageEl.width * s, h = _markerImageEl.height * s;
+          markerCtx.drawImage(_markerImageEl, (256 - w) / 2, (256 - h) / 2, w, h);
+        }
+
+        const imageData = markerCtx.getImageData(0, 0, markerCanvas.width, markerCanvas.height);
+        const markerInput = { data: imageData.data, width: markerCanvas.width, height: markerCanvas.height };
+
+        await compiler.compileImageTargets([markerInput], (progress) => {
           const pct = Math.round(progress * 100);
           progressBar.style.width = pct + '%';
           progressLabel.textContent = 'Compiling… ' + pct + '%';
