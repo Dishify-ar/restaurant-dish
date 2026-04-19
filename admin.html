@@ -9,6 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -492,6 +493,7 @@ service firebase.storage {
         <div class="card" style="margin-bottom:24px;border-color:rgba(201,168,76,.35)">
           <div class="card-title">🎯 Step 1 — Global AR Marker <span style="font-size:.7rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--cream-dim)">(one-time setup for all restaurants)</span></div>
 
+          <!-- Active status badge -->
           <div id="global-ar-status-wrap" style="display:none;margin-bottom:18px">
             <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(76,175,125,.08);border:1px solid rgba(76,175,125,.35);border-radius:4px;padding:10px 16px;font-size:.8rem;color:#4caf7d">
               ✅ Global AR marker is active
@@ -500,35 +502,47 @@ service firebase.storage {
           </div>
 
           <p style="font-size:.82rem;color:var(--cream-dim);line-height:1.8;max-width:580px;margin-bottom:20px">
-            <strong style="color:var(--gold)">How to set up (one time only):</strong><br>
-            1 · Download the Dishify AR marker image below<br>
-            2 · Go to <a href="https://saschalange.dev/Image-Target-Generator/index.html" target="_blank" style="color:var(--gold)">Image Target Generator ↗</a> and upload the marker image<br>
-            3 · Click <strong style="color:var(--gold)">Generate</strong> — this downloads a <code>.mind</code> file<br>
-            4 · Upload that <code>.mind</code> file to Firebase Storage or any public host<br>
-            5 · Paste the public URL below and click <strong style="color:var(--gold)">Save</strong>
+            The marker image below is compiled automatically in your browser and saved directly to Firebase — <strong style="color:var(--gold)">no external tools or file uploads needed.</strong><br>
+            Just click <strong style="color:var(--gold)">Compile &amp; Activate AR</strong> once. All restaurants share this marker.
           </p>
 
-          <!-- Downloadable marker preview -->
-          <div style="margin-bottom:20px">
-            <div style="font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:10px">AR Marker Image — Download & Compile</div>
-            <div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap">
-              <canvas id="marker-canvas" width="256" height="256" style="border:3px solid var(--gold);border-radius:4px;background:#fff;flex-shrink:0"></canvas>
-              <div style="display:flex;flex-direction:column;gap:10px;justify-content:center">
-                <p style="font-size:.78rem;color:var(--cream-dim);line-height:1.7;max-width:320px">This is the Dishify AR marker. Download it, then compile it at the MindAR tool above.</p>
+          <!-- Marker preview + optional custom upload -->
+          <div style="margin-bottom:22px">
+            <div style="font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:12px">AR Marker Image</div>
+            <div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+                <canvas id="marker-canvas" width="256" height="256" style="border:3px solid var(--gold);border-radius:4px;background:#fff;flex-shrink:0;display:block"></canvas>
+                <span style="font-size:.66rem;color:var(--cream-dim);letter-spacing:.1em">DEFAULT MARKER</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px;justify-content:center;max-width:320px">
+                <p style="font-size:.78rem;color:var(--cream-dim);line-height:1.7">This is the shared Dishify AR marker printed on every table card. You can also upload a custom marker image.</p>
+                <!-- Custom image upload -->
+                <div>
+                  <div style="font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:7px">Upload Custom Marker (optional)</div>
+                  <label id="marker-upload-label" style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px dashed rgba(201,168,76,.4);border-radius:3px;cursor:pointer;font-size:.76rem;color:var(--cream-dim);transition:all .18s ease" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='rgba(201,168,76,.4)';this.style.color='var(--cream-dim)'">
+                    📁 Choose Image
+                    <input type="file" id="custom-marker-input" accept="image/*" style="display:none" onchange="loadCustomMarker(this)">
+                  </label>
+                  <div id="custom-marker-name" style="font-size:.7rem;color:var(--cream-dim);margin-top:5px;display:none"></div>
+                </div>
                 <button class="btn btn-outline" onclick="downloadMarker()">⬇ Download Marker PNG</button>
               </div>
             </div>
           </div>
 
-          <!-- .mind URL input -->
-          <div class="form-group" style="max-width:560px">
-            <label>Compiled .mind File URL <span style="color:#bf4040">*</span></label>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <input id="global-mind-url" placeholder="https://your-storage.com/dishify_marker.mind" style="flex:1;min-width:220px" oninput="document.getElementById('mind-url-err').style.display='none'">
-              <button class="btn btn-gold" onclick="saveGlobalMindTarget()" style="flex-shrink:0">Save URL</button>
+          <!-- Compile button + progress -->
+          <div style="display:flex;flex-direction:column;gap:12px;max-width:420px">
+            <button id="compile-activate-btn" class="btn btn-gold" onclick="compileAndActivate()" style="font-size:.85rem;padding:13px 24px;letter-spacing:.12em">
+              ⚡ Compile &amp; Activate AR
+            </button>
+            <!-- Progress bar -->
+            <div id="compile-progress-wrap" style="display:none">
+              <div style="font-size:.72rem;color:var(--cream-dim);margin-bottom:6px;letter-spacing:.1em" id="compile-progress-label">Compiling…</div>
+              <div style="height:4px;background:rgba(201,168,76,.15);border-radius:2px;overflow:hidden">
+                <div id="compile-progress-bar" style="height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width .2s ease"></div>
+              </div>
             </div>
-            <div id="mind-url-err" style="display:none;font-size:.72rem;color:#bf4040;margin-top:5px"></div>
-            <div id="mind-url-ok" style="display:none;font-size:.72rem;color:#4caf7d;margin-top:5px">✅ Saved — AR is now active for all restaurants.</div>
+            <div id="compile-result" style="display:none;font-size:.78rem;line-height:1.6"></div>
           </div>
         </div>
 
@@ -963,7 +977,10 @@ service firebase.storage {
       },350);
     }
 
-    // ── GLOBAL AR MARKER — draw preview canvas & handle URL save ──
+    // ── GLOBAL AR MARKER — draw preview canvas, compile in-browser, save to Firebase ──
+
+    // Holds the image element to compile (default = drawn canvas, or custom upload)
+    let _markerImageEl = null;
 
     function drawMarkerCanvas(){
       const canvas = document.getElementById('marker-canvas');
@@ -988,6 +1005,118 @@ service firebase.storage {
       });
       // Inner grid
       [[80,80],[98,80],[149,80],[167,80],[80,98],[167,98],[80,149],[167,149],[80,167],[98,167],[149,167],[167,167]].forEach(([x,y])=>fr(x,y,9,9));
+      // After drawing, create an Image element from the canvas for the compiler
+      const img = new Image();
+      img.src = canvas.toDataURL('image/png');
+      img.onload = () => { _markerImageEl = img; };
+    }
+
+    function loadCustomMarker(input){
+      const file = input.files[0];
+      if(!file) return;
+      const nameEl = document.getElementById('custom-marker-name');
+      nameEl.textContent = '✓ ' + file.name;
+      nameEl.style.display = 'block';
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          // Draw preview on canvas
+          const canvas = document.getElementById('marker-canvas');
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0,0,256,256);
+          // Fit image in canvas maintaining aspect ratio
+          const scale = Math.min(256/img.width, 256/img.height);
+          const w = img.width*scale, h = img.height*scale;
+          ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256);
+          ctx.drawImage(img, (256-w)/2, (256-h)/2, w, h);
+          _markerImageEl = img;
+          showToast('Custom marker loaded — click Compile & Activate');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function compileAndActivate(){
+      const btn = document.getElementById('compile-activate-btn');
+      const progressWrap = document.getElementById('compile-progress-wrap');
+      const progressBar = document.getElementById('compile-progress-bar');
+      const progressLabel = document.getElementById('compile-progress-label');
+      const resultEl = document.getElementById('compile-result');
+
+      // Check MindAR compiler is loaded
+      if(!window.MINDAR || !window.MINDAR.IMAGE || !window.MINDAR.IMAGE.Compiler){
+        resultEl.style.display='block';
+        resultEl.innerHTML='<span style="color:#bf4040">⚠ MindAR compiler not loaded yet. Please wait a moment and try again.</span>';
+        return;
+      }
+
+      if(!_markerImageEl){
+        resultEl.style.display='block';
+        resultEl.innerHTML='<span style="color:#bf4040">⚠ Marker image not ready. Please wait a second and try again.</span>';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Compiling…';
+      progressWrap.style.display = 'block';
+      progressBar.style.width = '0%';
+      progressLabel.textContent = 'Initialising compiler…';
+      resultEl.style.display = 'none';
+
+      try {
+        const compiler = new window.MINDAR.IMAGE.Compiler();
+
+        // compileImageTargets fires a progress callback (0–1)
+        await compiler.compileImageTargets([_markerImageEl], (progress) => {
+          const pct = Math.round(progress * 100);
+          progressBar.style.width = pct + '%';
+          progressLabel.textContent = 'Compiling… ' + pct + '%';
+        });
+
+        progressLabel.textContent = 'Exporting data…';
+        progressBar.style.width = '100%';
+
+        // exportData() returns an ArrayBuffer
+        const buffer = compiler.exportData();
+
+        progressLabel.textContent = 'Encoding…';
+        // Convert ArrayBuffer → base64 data URI
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for(let i=0;i<bytes.byteLength;i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
+        const dataUrl = 'data:application/octet-stream;base64,' + base64;
+
+        progressLabel.textContent = 'Saving to Firebase…';
+
+        // Save directly to Firebase — no hosting required
+        await db.ref('config/globalMindTarget').set({
+          url: dataUrl,
+          compiledAt: Date.now(),
+          source: 'auto-compiled'
+        });
+
+        progressWrap.style.display = 'none';
+        btn.textContent = '✅ AR Active!';
+        btn.style.background = '#4caf7d';
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:#4caf7d">✅ Compiled and saved successfully! AR is now live for all restaurants.<br><span style="color:var(--cream-dim);font-size:.72rem">The .mind data is stored in Firebase — no external hosting needed.</span></span>';
+        showGlobalARStatus();
+        showToast('✓ AR marker is now live!');
+
+        // Re-enable with updated label after 3s
+        setTimeout(()=>{ btn.disabled=false; btn.textContent='⚡ Recompile AR'; btn.style.background=''; }, 3000);
+
+      } catch(err) {
+        progressWrap.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = '⚡ Compile & Activate AR';
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Compilation failed: ' + (err.message||err) + '</span>';
+        console.error('MindAR compile error:', err);
+      }
     }
 
     function downloadMarker(){
@@ -999,27 +1128,6 @@ service firebase.storage {
       a.click();
     }
 
-    async function saveGlobalMindTarget(){
-      const url = document.getElementById('global-mind-url').value.trim();
-      const errEl = document.getElementById('mind-url-err');
-      const okEl = document.getElementById('mind-url-ok');
-      errEl.style.display='none'; okEl.style.display='none';
-      if(!url){
-        errEl.textContent='Please enter a URL.'; errEl.style.display='block'; return;
-      }
-      if(!url.startsWith('http')){
-        errEl.textContent='URL must start with http:// or https://'; errEl.style.display='block'; return;
-      }
-      try{
-        await db.ref('config/globalMindTarget').set({ url, compiledAt: Date.now() });
-        okEl.style.display='block';
-        showGlobalARStatus();
-        showToast('✓ AR marker URL saved!');
-      } catch(e){
-        errEl.textContent='Failed to save: '+(e.message||e); errEl.style.display='block';
-      }
-    }
-
     function showGlobalARStatus(){
       db.ref('config/globalMindTarget').once('value', snap=>{
         const d = snap.val();
@@ -1028,10 +1136,7 @@ service firebase.storage {
         if(d && d.url){
           wrap.style.display='block';
           const dateEl = document.getElementById('global-ar-date');
-          if(dateEl && d.compiledAt) dateEl.textContent='· saved '+new Date(d.compiledAt).toLocaleDateString('en-PK');
-          // Pre-fill the input with existing URL
-          const inp = document.getElementById('global-mind-url');
-          if(inp && !inp.value) inp.value = d.url;
+          if(dateEl && d.compiledAt) dateEl.textContent='· compiled '+new Date(d.compiledAt).toLocaleDateString('en-PK');
         } else {
           wrap.style.display='none';
         }
