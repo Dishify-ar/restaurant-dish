@@ -1115,7 +1115,7 @@ service firebase.storage {
       } catch(e) { /* continue regardless */ }
 
       btn.textContent = '⏳ Compiling…';
-      progressLabel.textContent = 'Initialising compiler…';
+      progressLabel.textContent = 'Extracting marker features…';
 
       try {
         const compiler = new CompilerClass();
@@ -1140,10 +1140,11 @@ service firebase.storage {
           markerCtx.drawImage(_markerImageEl, (256 - w) / 2, (256 - h) / 2, w, h);
         }
 
-        const imageData = markerCtx.getImageData(0, 0, markerCanvas.width, markerCanvas.height);
-        const markerInput = { data: imageData.data, width: markerCanvas.width, height: markerCanvas.height };
-
-        await compiler.compileImageTargets([markerInput], (progress) => {
+        // Pass the canvas element directly — compileImageTargets calls drawImage()
+        // internally, which only works with HTMLImageElement / HTMLCanvasElement.
+        // Passing a plain {data,width,height} object causes drawImage to silently
+        // fail, leaving the compiler hanging at 0 % forever.
+        await compiler.compileImageTargets([markerCanvas], (progress) => {
           const pct = Math.round(progress * 100);
           progressBar.style.width = pct + '%';
           progressLabel.textContent = 'Compiling… ' + pct + '%';
