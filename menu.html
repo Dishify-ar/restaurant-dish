@@ -215,10 +215,28 @@
   <nav>
     <a class="nav-logo" href="index.html">DISHIFY</a>
     <span class="nav-restaurant" id="nav-rest-name">Loading…</span>
-    <button class="cart-btn" onclick="openMobileDrawer()">
-      <span>Order</span><span class="cart-count" id="cart-count">0</span>
-    </button>
+    <div style="display:flex;align-items:center;gap:10px">
+      <!-- Notification Bell -->
+      <button id="notif-bell" onclick="toggleNotifPanel()" title="Order notifications" style="position:relative;background:transparent;border:1px solid transparent;color:var(--text-dim);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.1rem;transition:all .18s ease;display:none" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="if(!document.getElementById('notif-panel').classList.contains('open')){this.style.borderColor='transparent';this.style.color='var(--text-dim)'}">
+        🔔
+        <span id="notif-badge" style="display:none;position:absolute;top:4px;right:4px;background:var(--primary);color:var(--bg);width:16px;height:16px;border-radius:50%;font-size:.58rem;font-weight:700;align-items:center;justify-content:center;line-height:1"></span>
+      </button>
+      <button class="cart-btn" onclick="openMobileDrawer()">
+        <span>Order</span><span class="cart-count" id="cart-count">0</span>
+      </button>
+    </div>
   </nav>
+
+  <!-- Notification Panel -->
+  <div id="notif-panel" style="display:none;position:fixed;top:70px;right:16px;z-index:9100;width:300px;max-width:calc(100vw - 32px);background:rgba(14,13,10,.97);border:1px solid rgba(201,168,76,.3);border-radius:8px;backdrop-filter:blur(20px);box-shadow:0 16px 48px rgba(0,0,0,.6);overflow:hidden;transform:translateY(-8px) scale(.97);opacity:0;transition:transform .2s cubic-bezier(.4,0,.2,1),opacity .2s ease">
+    <div style="padding:12px 16px;border-bottom:1px solid rgba(201,168,76,.15);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;color:var(--primary)">Notifications</span>
+      <button onclick="clearAllNotifs()" style="font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;background:transparent;border:none;color:var(--text-dim);cursor:pointer;padding:2px 6px;transition:color .15s" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-dim)'">Clear all</button>
+    </div>
+    <div id="notif-list" style="max-height:320px;overflow-y:auto;padding:8px 0">
+      <div id="notif-empty" style="padding:24px 16px;text-align:center;font-size:.78rem;color:var(--text-dim)">No notifications yet</div>
+    </div>
+  </div>
 
   <!-- ORDER STATUS TRACKER (persists across sessions via localStorage) -->
   <div id="order-tracker" style="display:none;position:sticky;top:70px;z-index:95;background:linear-gradient(135deg,rgba(14,13,10,.98),rgba(26,24,21,.98));border-bottom:1px solid rgba(201,168,76,.25);backdrop-filter:blur(20px)">
@@ -684,6 +702,7 @@
     }
 
     function watchOrderStatus(fbKey, orderId) {
+      let prevStatus = null;
       db.ref('orders/'+rid+'/'+fbKey+'/status').on('value', snap => {
         const status = snap.val();
         if(!status) return;
@@ -691,6 +710,11 @@
         const idx = saved.findIndex(o => o.orderId === orderId);
         if(idx > -1) { saved[idx].status = status; localStorage.setItem(TRACKER_KEY, JSON.stringify(saved)); }
         renderTracker();
+        // Push notification on status change (not on first load)
+        if(prevStatus !== null && prevStatus !== status) {
+          pushOrderNotification(orderId, status);
+        }
+        prevStatus = status;
       });
     }
 
@@ -808,6 +832,137 @@
     // Init chat once restaurant is loaded
     const _origDbOn = db.ref('restaurants/' + rid).on;
     setTimeout(initChat, 1200);
+
+    // ── NOTIFICATION BELL ──
+    const NOTIF_KEY = 'dishify_notifs_v1';
+    let notifPanelOpen = false;
+
+    const STATUS_NOTIF = {
+      new:       { icon: '✦', text: 'Order received',        color: 'var(--primary)' },
+      preparing: { icon: '⏳', text: 'Your order is being prepared', color: '#e0a020' },
+      ready:     { icon: '✓', text: 'Your order is ready!',  color: '#4caf7d' },
+      done:      { icon: '◻', text: 'Order complete',        color: '#888' }
+    };
+
+    function getNotifs() {
+      try { return JSON.parse(localStorage.getItem(NOTIF_KEY + '_' + rid) || '[]'); } catch(e) { return []; }
+    }
+    function saveNotifs(arr) {
+      localStorage.setItem(NOTIF_KEY + '_' + rid, JSON.stringify(arr));
+    }
+
+    function pushOrderNotification(orderId, status) {
+      const cfg = STATUS_NOTIF[status] || { icon: '•', text: 'Status updated', color: 'var(--primary)' };
+      const notif = { orderId, status, text: cfg.text, ts: Date.now(), read: false };
+      const all = getNotifs();
+      all.unshift(notif);
+      saveNotifs(all.slice(0, 30)); // keep last 30
+      renderNotifBell();
+      renderNotifList();
+      // Show toast
+      showToast(cfg.icon + ' Order #' + orderId + ' — ' + cfg.text);
+      // Browser push notification
+      if (Notification && Notification.permission === 'granted') {
+        new Notification('Dishify — Order #' + orderId, { body: cfg.text });
+      }
+    }
+
+    function renderNotifBell() {
+      const bell = document.getElementById('notif-bell');
+      const badge = document.getElementById('notif-badge');
+      if (!bell) return;
+      const unread = getNotifs().filter(n => !n.read).length;
+      bell.style.display = 'flex';
+      if (unread > 0) {
+        badge.textContent = unread > 9 ? '9+' : unread;
+        badge.style.display = 'flex';
+        // Pulse animation
+        bell.style.animation = 'none';
+        void bell.offsetWidth; // reflow
+        bell.style.animation = 'bellPulse .5s ease';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    function renderNotifList() {
+      const list = document.getElementById('notif-list');
+      const empty = document.getElementById('notif-empty');
+      if (!list) return;
+      const all = getNotifs();
+      if (!all.length) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      const cfg = STATUS_NOTIF;
+      list.innerHTML = all.map((n, i) => {
+        const c = cfg[n.status] || { icon: '•', color: 'var(--primary)' };
+        const time = new Date(n.ts).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+        return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04);background:${n.read ? 'transparent' : 'rgba(201,168,76,.04)'}">
+          <span style="font-size:1rem;color:${c.color};flex-shrink:0;margin-top:1px">${c.icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.8rem;color:var(--text);font-weight:${n.read ? '400' : '600'}">${n.text}</div>
+            <div style="font-size:.68rem;color:var(--text-dim);margin-top:2px">Order #${n.orderId} · ${time}</div>
+          </div>
+          ${!n.read ? `<span style="width:6px;height:6px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:5px"></span>` : ''}
+        </div>`;
+      }).join('') + `<div id="notif-empty" style="display:none;padding:24px 16px;text-align:center;font-size:.78rem;color:var(--text-dim)">No notifications yet</div>`;
+    }
+
+    function toggleNotifPanel() {
+      notifPanelOpen = !notifPanelOpen;
+      const panel = document.getElementById('notif-panel');
+      const bell = document.getElementById('notif-bell');
+      panel.style.display = 'block';
+      requestAnimationFrame(() => {
+        panel.style.transform = notifPanelOpen ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(.97)';
+        panel.style.opacity = notifPanelOpen ? '1' : '0';
+        bell.style.borderColor = notifPanelOpen ? 'var(--primary)' : 'transparent';
+        bell.style.color = notifPanelOpen ? 'var(--primary)' : 'var(--text-dim)';
+      });
+      if (!notifPanelOpen) {
+        setTimeout(() => { panel.style.display = 'none'; }, 200);
+      } else {
+        // Mark all as read
+        const all = getNotifs().map(n => ({ ...n, read: true }));
+        saveNotifs(all);
+        renderNotifBell();
+        renderNotifList();
+      }
+    }
+
+    function clearAllNotifs() {
+      saveNotifs([]);
+      renderNotifBell();
+      renderNotifList();
+    }
+
+    // Close panel when clicking outside
+    document.addEventListener('click', e => {
+      const panel = document.getElementById('notif-panel');
+      const bell = document.getElementById('notif-bell');
+      if (notifPanelOpen && panel && bell && !panel.contains(e.target) && !bell.contains(e.target)) {
+        notifPanelOpen = false;
+        panel.style.transform = 'translateY(-8px) scale(.97)';
+        panel.style.opacity = '0';
+        bell.style.borderColor = 'transparent';
+        bell.style.color = 'var(--text-dim)';
+        setTimeout(() => { panel.style.display = 'none'; }, 200);
+      }
+    });
+
+    // Show bell if there are existing notifications on load
+    if (getNotifs().length) renderNotifBell();
   </script>
+  <style>
+    @keyframes bellPulse {
+      0%   { transform: rotate(0deg) scale(1); }
+      25%  { transform: rotate(-18deg) scale(1.15); }
+      50%  { transform: rotate(18deg) scale(1.15); }
+      75%  { transform: rotate(-10deg) scale(1.05); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+  </style>
 </body>
 </html>

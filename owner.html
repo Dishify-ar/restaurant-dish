@@ -371,18 +371,22 @@
       <hr class="divider">
       <div class="footer">Thank you for dining with us!<br>Powered by Dishify</div>
       </body></html>`;
-      // Use hidden iframe — bypasses popup blockers
-      let frame = document.getElementById('_print_frame');
-      if(frame) frame.remove();
-      frame = document.createElement('iframe');
-      frame.id = '_print_frame';
-      frame.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:400px;height:600px;border:none;';
-      document.body.appendChild(frame);
-      frame.contentDocument.open();
-      frame.contentDocument.write(html);
-      frame.contentDocument.close();
-      frame.contentWindow.focus();
-      setTimeout(() => { frame.contentWindow.print(); }, 500);
+      // Open in popup window for printing (most reliable cross-browser)
+      const win = window.open('', '_blank', 'width=420,height=680,scrollbars=yes');
+      if (!win) {
+        // Fallback if popup blocked: blob URL download
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.target = '_blank'; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        return;
+      }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => { win.print(); }, 600);
     }
 
     // ── LOAD RESTAURANTS INTO PICKER ──
