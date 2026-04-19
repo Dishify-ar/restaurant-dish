@@ -130,13 +130,41 @@
 
     @media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
     @media(max-width:700px){
-      .sidebar{display:none}.main{margin-left:0;padding:20px}
-      .form-group label{font-size:.7rem}
-      input,select,textarea{font-size:.86rem}
-      .page-title{font-size:1.4rem}
-      .btn{font-size:.75rem;padding:9px 16px}
-      table{font-size:.78rem}
-      th,td{padding:10px 8px}
+      /* Layout */
+      .sidebar{display:none}
+      .main{margin-left:0;padding:16px 14px}
+      /* Typography */
+      .page-title{font-size:1.4rem;margin-bottom:2px}
+      .page-subtitle{font-size:.76rem}
+      .card-title{font-size:.88rem}
+      /* Forms */
+      .form-group{margin-bottom:12px}
+      .form-group label{font-size:.68rem;letter-spacing:.18em}
+      input,select,textarea{font-size:.86rem;padding:9px 12px}
+      /* Buttons */
+      .btn{font-size:.74rem;padding:9px 14px;letter-spacing:.08em}
+      .btn-gold,.btn-outline,.btn-danger{font-size:.74rem;padding:9px 14px}
+      /* Stats row */
+      .stats-row{grid-template-columns:1fr 1fr;gap:10px}
+      .stat-card{padding:16px 14px}
+      .stat-val{font-size:1.9rem}
+      .stat-label{font-size:.62rem;letter-spacing:.15em}
+      /* Tables */
+      table{font-size:.76rem}
+      th{font-size:.62rem;padding:8px 8px;letter-spacing:.1em}
+      td{padding:10px 8px}
+      /* Cards */
+      .card{padding:18px 14px}
+      /* Modal boxes */
+      .modal-box{padding:24px 18px;border-radius:6px}
+      .modal-title{font-size:1.3rem}
+      /* QR wrap */
+      .qr-wrap{margin:16px 0}
+      /* Upload zones */
+      .upload-zone{padding:18px 14px}
+      /* Vibe grid */
+      .vibe-grid{grid-template-columns:repeat(3,1fr)}
+      .vibe-pill{padding:8px 4px;font-size:.7rem}
     }
 
     .upload-error-msg{display:block;margin-top:8px;padding:10px 14px;background:rgba(191,64,64,.08);border:1px solid rgba(191,64,64,.3);border-radius:4px;font-size:.76rem;color:#e06060;line-height:1.5}
@@ -912,58 +940,79 @@ service firebase.storage {
     }
 
     // ── GLOBAL AR MARKER (one-time, shared by all restaurants) ──
-    // We compile a fixed built-in marker image once and store the .mind URL
-    // at Firebase path: config/globalMindTarget
-    // ar.html reads this single URL — no per-restaurant setup needed.
+    // Compiled from a built-in canvas-drawn marker. Stored at Firebase config/globalMindTarget.
+    // ar.html reads this — no per-restaurant setup needed.
 
-    // Built-in Dishify AR marker: a high-contrast geometric image that MindAR tracks reliably.
-    // This is a small SVG rendered to canvas → compiled as the universal target.
-    const DISHIFY_MARKER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-      <rect width="512" height="512" fill="#ffffff"/>
-      <!-- Bold outer border -->
-      <rect x="20" y="20" width="472" height="472" fill="none" stroke="#000" stroke-width="20"/>
-      <!-- Corner squares (like QR finder patterns) -->
-      <rect x="40" y="40" width="90" height="90" fill="#000"/>
-      <rect x="55" y="55" width="60" height="60" fill="#fff"/>
-      <rect x="68" y="68" width="34" height="34" fill="#000"/>
-      <rect x="382" y="40" width="90" height="90" fill="#000"/>
-      <rect x="397" y="55" width="60" height="60" fill="#fff"/>
-      <rect x="410" y="68" width="34" height="34" fill="#000"/>
-      <rect x="40" y="382" width="90" height="90" fill="#000"/>
-      <rect x="55" y="397" width="60" height="60" fill="#fff"/>
-      <rect x="68" y="410" width="34" height="34" fill="#000"/>
-      <!-- Centre logo mark -->
-      <circle cx="256" cy="256" r="70" fill="#000"/>
-      <circle cx="256" cy="256" r="50" fill="#fff"/>
-      <circle cx="256" cy="256" r="30" fill="#000"/>
-      <!-- Radial tick marks -->
-      <line x1="256" y1="155" x2="256" y2="175" stroke="#000" stroke-width="10"/>
-      <line x1="256" y1="337" x2="256" y2="357" stroke="#000" stroke-width="10"/>
-      <line x1="155" y1="256" x2="175" y2="256" stroke="#000" stroke-width="10"/>
-      <line x1="337" y1="256" x2="357" y2="256" stroke="#000" stroke-width="10"/>
-      <!-- Inner grid pattern for feature richness -->
-      <rect x="160" y="160" width="18" height="18" fill="#000"/>
-      <rect x="196" y="160" width="18" height="18" fill="#000"/>
-      <rect x="298" y="160" width="18" height="18" fill="#000"/>
-      <rect x="334" y="160" width="18" height="18" fill="#000"/>
-      <rect x="160" y="196" width="18" height="18" fill="#000"/>
-      <rect x="334" y="196" width="18" height="18" fill="#000"/>
-      <rect x="160" y="298" width="18" height="18" fill="#000"/>
-      <rect x="334" y="298" width="18" height="18" fill="#000"/>
-      <rect x="160" y="334" width="18" height="18" fill="#000"/>
-      <rect x="196" y="334" width="18" height="18" fill="#000"/>
-      <rect x="298" y="334" width="18" height="18" fill="#000"/>
-      <rect x="334" y="334" width="18" height="18" fill="#000"/>
-    </svg>`;
+    // Render the marker SVG onto a canvas and return an HTMLImageElement
+    // (canvas-based avoids SVG blob cross-origin issues in some browsers)
+    async function markerToImage(size=512){
+      return new Promise((res, rej)=>{
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        // Outer border
+        ctx.strokeStyle = '#000000'; ctx.lineWidth = 20;
+        ctx.strokeRect(20, 20, 472, 472);
+        // Helper: filled rect
+        const fr=(x,y,w,h,c='#000')=>{ ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
+        // Corner finder patterns
+        fr(40,40,90,90); fr(55,55,60,60,'#fff'); fr(68,68,34,34);
+        fr(382,40,90,90); fr(397,55,60,60,'#fff'); fr(410,68,34,34);
+        fr(40,382,90,90); fr(55,397,60,60,'#fff'); fr(68,410,34,34);
+        // Centre bullseye
+        ctx.beginPath(); ctx.arc(256,256,70,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+        ctx.beginPath(); ctx.arc(256,256,50,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+        ctx.beginPath(); ctx.arc(256,256,30,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+        // Tick marks
+        ctx.strokeStyle='#000'; ctx.lineWidth=10;
+        [[256,155,256,175],[256,337,256,357],[155,256,175,256],[337,256,357,256]].forEach(([x1,y1,x2,y2])=>{
+          ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+        });
+        // Inner grid dots
+        [[160,160],[196,160],[298,160],[334,160],[160,196],[334,196],
+         [160,298],[334,298],[160,334],[196,334],[298,334],[334,334]].forEach(([x,y])=>fr(x,y,18,18));
+        // Export canvas → Image
+        const img = new Image();
+        img.onload = ()=>res(img);
+        img.onerror = rej;
+        img.src = canvas.toDataURL('image/png');
+      });
+    }
 
-    async function svgToImage(svgStr, size=512){
-      return new Promise((res,rej)=>{
-        const blob=new Blob([svgStr],{type:'image/svg+xml'});
-        const url=URL.createObjectURL(blob);
-        const img=new Image(size,size);
-        img.onload=()=>{ URL.revokeObjectURL(url); res(img); };
-        img.onerror=rej;
-        img.src=url;
+    async function loadMindARCompiler(setS){
+      if(window.MINDAR && window.MINDAR.IMAGE) return;
+      // Try primary CDN first, then fallback
+      const cdns = [
+        'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js',
+        'https://unpkg.com/mind-ar@1.2.5/dist/mindar-image.prod.js'
+      ];
+      let loaded = false;
+      for(const src of cdns){
+        if(loaded) break;
+        try{
+          setS(`⏳ Loading MindAR compiler…`);
+          await new Promise((res,rej)=>{
+            const s=document.createElement('script');
+            s.src=src; s.onload=res; s.onerror=rej;
+            document.head.appendChild(s);
+          });
+          loaded = true;
+        } catch(e){ /* try next */ }
+      }
+      if(!loaded) throw new Error('Could not load MindAR compiler. Check your internet connection.');
+      // Wait up to 30 seconds for MINDAR.IMAGE to be available
+      setS('⏳ Initialising compiler (may take up to 30s on first run)…');
+      await new Promise((res,rej)=>{
+        let n=0;
+        const check=()=>{
+          if(window.MINDAR && window.MINDAR.IMAGE){ res(); }
+          else if(++n > 120){ rej(new Error('MindAR took too long to initialise. Please retry.')); }
+          else { setTimeout(check, 250); }
+        };
+        check();
       });
     }
 
@@ -975,23 +1024,12 @@ service firebase.storage {
       const setS=(html,color='var(--cream-dim)')=>{ status.innerHTML=html; status.style.color=color; };
 
       try {
-        // 1. Load MindAR compiler
-        setS('⏳ Loading MindAR compiler…');
-        if(!window.MINDAR||!window.MINDAR.IMAGE){
-          await new Promise((res,rej)=>{
-            const s=document.createElement('script');
-            s.src='https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js';
-            s.onload=res; s.onerror=rej;
-            document.head.appendChild(s);
-          });
-          await new Promise((res,rej)=>{
-            let n=0; const check=()=>{ if(window.MINDAR&&window.MINDAR.IMAGE) res(); else if(++n>60) rej(new Error('MindAR init timeout')); else setTimeout(check,250); }; check();
-          });
-        }
+        // 1. Load MindAR compiler (with fallback CDN + generous timeout)
+        await loadMindARCompiler(setS);
 
-        // 2. Render marker SVG → Image
+        // 2. Render marker image via canvas (avoids SVG blob cross-origin issues)
         setS('⏳ Rendering marker image…');
-        const markerImg = await svgToImage(DISHIFY_MARKER_SVG, 512);
+        const markerImg = await markerToImage(512);
 
         // 3. Compile
         setS('⏳ Compiling image target (10–20 seconds)…');

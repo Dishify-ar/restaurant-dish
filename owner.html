@@ -139,21 +139,44 @@
 
     @media(max-width:900px){.stats-row{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:600px){
-      header{padding:0 16px}
-      main{padding:20px}
-      .stats-row{grid-template-columns:1fr 1fr}
-      .orders-grid{grid-template-columns:1fr}
-      .rest-grid{grid-template-columns:1fr}
+      /* Header */
+      header{padding:0 14px;height:58px}
+      .header-logo{font-size:1.3rem}
+      .header-rest{font-size:.6rem;padding:3px 8px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .header-right .icon-btn{display:none}
-      .stat-val{font-size:2rem}
-      .stat-label{font-size:.65rem}
-      .order-card{padding:16px 14px}
-      .order-id{font-size:.78rem}
-      .order-table{font-size:.78rem}
-      .order-item-line{font-size:.8rem;color:rgba(240,232,213,0.8)}
-      .order-total{font-size:.88rem}
-      .order-status{font-size:.65rem;padding:4px 9px}
-      .section-title{font-size:1.1rem}
+      .live-badge{font-size:.6rem;padding:4px 8px;gap:4px}
+      .logout-btn{font-size:.68rem;padding:6px 12px}
+      /* Main */
+      main{padding:16px 14px}
+      .page-title{font-size:1.8rem}
+      .page-subtitle{font-size:.74rem}
+      /* Stats */
+      .stats-row{grid-template-columns:1fr 1fr;gap:10px}
+      .stat-card{padding:16px 14px}
+      .stat-val{font-size:1.8rem}
+      .stat-label{font-size:.62rem;letter-spacing:.15em}
+      /* Restaurant select screen */
+      .select-box{padding:32px 20px}
+      .select-logo{font-size:2rem}
+      .rest-grid{grid-template-columns:1fr}
+      .rest-pick-btn{padding:14px 12px}
+      /* Login box */
+      .login-box{padding:40px 24px}
+      /* Orders */
+      .orders-grid{grid-template-columns:1fr}
+      .order-card{padding:18px 14px}
+      .order-id{font-size:.64rem}
+      .order-table{font-size:1.2rem}
+      .order-line{font-size:.82rem}
+      .order-line-price{font-size:.82rem}
+      .order-total-row span:last-child{font-size:1.1rem}
+      .status-btn{font-size:.66rem;padding:8px 8px}
+      /* Tabs */
+      .rest-tabs{gap:6px}
+      .rest-tab{padding:8px 14px;font-size:.7rem}
+      /* Chat */
+      .chat-sessions-grid{grid-template-columns:1fr;height:auto}
+      .chat-session-list{max-height:200px;border-right:none;border-bottom:1px solid #2a2520}
     }
 
     /* ── CHAT PANEL (owner side) ── */
