@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="mindar-image-patched.js"></script>
+  <script src="mindar-image-patched.js?v=4"></script>
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1025,12 +1025,21 @@ service firebase.storage {
           const canvas = document.getElementById('marker-canvas');
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0,0,256,256);
-          // Fit image in canvas maintaining aspect ratio
           const scale = Math.min(256/img.width, 256/img.height);
           const w = img.width*scale, h = img.height*scale;
           ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256);
           ctx.drawImage(img, (256-w)/2, (256-h)/2, w, h);
           _markerImageEl = img;
+
+          // Warn if this looks like a logo (too smooth, not a good AR marker)
+          const resultEl = document.getElementById('compile-result');
+          const isLogo = file.name.toLowerCase().includes('logo') || file.name.toLowerCase().includes('icon') || file.name.toLowerCase().includes('mark');
+          if(isLogo) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span style="color:#e0a020">⚠ Warning: Logos make poor AR markers — they have too few unique features for reliable tracking. For best results, use the default Dishify marker or a photo with lots of detail and contrast.</span>';
+          } else {
+            resultEl.style.display = 'none';
+          }
           showToast('Custom marker loaded — click Compile & Activate');
         };
         img.src = e.target.result;
