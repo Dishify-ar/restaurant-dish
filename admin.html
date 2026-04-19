@@ -1080,15 +1080,24 @@ service firebase.storage {
         return;
       }
 
-      btn.textContent = '⏳ Compiling…';
+      btn.textContent = '⏳ Warming up…';
       progressWrap.style.display = 'block';
       progressBar.style.width = '0%';
+      progressLabel.textContent = 'Initialising TF backend (CPU)…';
+
+      // Wait for TF.js CPU backend to be ready before compiling
+      try {
+        if (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE._tf) {
+          await window.MINDAR.IMAGE._tf.ready();
+        }
+      } catch(e) { /* continue regardless */ }
+
+      btn.textContent = '⏳ Compiling…';
       progressLabel.textContent = 'Initialising compiler…';
 
       try {
         const compiler = new CompilerClass();
 
-        // compileImageTargets fires a progress callback (0–1)
         await compiler.compileImageTargets([_markerImageEl], (progress) => {
           const pct = Math.round(progress * 100);
           progressBar.style.width = pct + '%';
