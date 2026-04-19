@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dishify • The Future of Dining</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <style>
+    :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.15);--ink:#070604;--ink2:#0e0d0a;--ink3:#1a1815;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.6)}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :focus-visible{outline:2px solid var(--gold,#c9a84c);outline-offset:2px}
+    :focus:not(:focus-visible){outline:none}
+    html{scroll-behavior:smooth}
+    body{background:var(--ink);color:var(--cream);font-family:'Outfit',sans-serif;overflow-x:hidden;cursor:none}
+    *{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+    @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    .cursor{width:10px;height:10px;background:var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform:translate(0,0) translate(-50%,-50%);mix-blend-mode:difference;will-change:transform}
+    .cursor-ring{width:38px;height:38px;border:1px solid var(--gold);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;transform:translate(0,0) translate(-50%,-50%);opacity:.5;will-change:transform;transition:none}
+    body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:1;opacity:.35}
+    .topnav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 60px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(7,6,4,.92) 0%,rgba(7,6,4,.6) 60%,transparent 100%)}
+    .nav-logo{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:var(--gold);letter-spacing:.1em;text-decoration:none}
+    .nav-links{display:flex;gap:32px;align-items:center}
+    .nav-links a{color:var(--cream-dim);text-decoration:none;font-size:.78rem;letter-spacing:.1em;transition:color .12s ease}
+    .nav-links a:hover{color:var(--gold)}
+    .hero{height:100vh;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .hero-bg{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(7,6,4,.25) 0%,rgba(7,6,4,.65) 60%,var(--ink) 100%),url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1800&q=80') center/cover;transform:scale(1.06);animation:zoomBg 18s ease-in-out infinite alternate}
+    @keyframes zoomBg{from{transform:scale(1.06)}to{transform:scale(1.13)}}
+    .hero-content{position:relative;z-index:2;text-align:center}
+    .hero-eyebrow{font-size:.72rem;letter-spacing:.45em;color:var(--gold);text-transform:uppercase;font-weight:500;margin-bottom:22px;opacity:0;animation:fadeUp 1s .3s forwards}
+    .hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(5rem,13vw,12rem);font-weight:300;line-height:.87;color:var(--cream);letter-spacing:-.02em;opacity:0;animation:fadeUp 1s .5s forwards}
+    .hero-title em{color:var(--gold);font-style:italic}
+    .hero-sub{font-size:1rem;font-weight:300;color:var(--cream-dim);margin-top:26px;letter-spacing:.04em;opacity:0;animation:fadeUp 1s .7s forwards;max-width:520px;margin-left:auto;margin-right:auto}
+    .hero-ctas{display:flex;gap:16px;justify-content:center;margin-top:48px;opacity:0;animation:fadeUp 1s .9s forwards;flex-wrap:wrap}
+    .hero-cta{display:inline-flex;align-items:center;gap:10px;padding:16px 36px;font-weight:600;font-size:.82rem;letter-spacing:.15em;text-transform:uppercase;text-decoration:none;border-radius:2px;transition:all .18s cubic-bezier(.4,0,.2,1)}
+    .hero-cta.primary{background:var(--gold);color:var(--ink)}
+    .hero-cta.primary:hover{background:var(--gold-light);transform:translateY(-2px);box-shadow:0 12px 40px rgba(201,168,76,.35)}
+    .hero-cta.secondary{background:transparent;border:1px solid rgba(240,232,213,.3);color:var(--cream)}
+    .hero-cta.secondary:hover{border-color:var(--gold);color:var(--gold)}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+    .scroll-hint{position:absolute;bottom:38px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--cream-dim);font-size:.68rem;letter-spacing:.35em;text-transform:uppercase;animation:bounce 2s ease-in-out infinite}
+    .scroll-hint::after{content:'';width:1px;height:48px;background:linear-gradient(to bottom,var(--gold),transparent)}
+    @keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#222018;border-top:1px solid #222018;border-bottom:1px solid #222018}
+    .feature{background:var(--ink2);padding:50px 40px;text-align:center;transition:background .3s}
+    .feature:hover{background:var(--ink3)}
+    .feature-icon{font-size:2.4rem;margin-bottom:18px;display:block}
+    .feature h3{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:400;color:var(--gold);margin-bottom:10px}
+    .feature p{font-size:.85rem;color:var(--cream-dim);line-height:1.75}
+    .section-wrap{padding:100px 60px;max-width:1200px;margin:0 auto}
+    .section-label{font-size:.68rem;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);margin-bottom:14px;font-weight:500}
+    .section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--cream);margin-bottom:48px;line-height:1.1}
+    .section-title em{color:var(--gold);font-style:italic}
+    .why-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#222018}
+    .why-cell{background:var(--ink2);padding:48px 44px;position:relative;overflow:hidden}
+    .why-cell::before{content:'';position:absolute;top:0;left:0;width:3px;height:0;background:var(--gold);transition:height .35s cubic-bezier(.4,0,.2,1)}
+    .why-cell:hover::before{height:100%}
+    .why-num{font-family:'Cormorant Garamond',serif;font-size:4rem;font-weight:300;color:rgba(201,168,76,.12);line-height:1;margin-bottom:12px}
+    .why-title{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--gold);margin-bottom:12px}
+    .why-desc{font-size:.86rem;color:var(--cream-dim);line-height:1.8}
+    .stats-strip{background:var(--ink3);border-top:1px solid #2a2520;border-bottom:1px solid #2a2520;padding:60px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;text-align:center}
+    .strip-stat{padding:20px;border-right:1px solid #2a2520}
+    .strip-stat:last-child{border-right:none}
+    .strip-val{font-family:'Cormorant Garamond',serif;font-size:3.5rem;font-weight:300;color:var(--gold);line-height:1}
+    .strip-label{font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:var(--cream-dim);margin-top:8px}
+    /* RESTAURANTS — display only */
+    .restaurants-section{padding:100px 60px;max-width:1400px;margin:0 auto}
+    .restaurant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px}
+    .restaurant-card{position:relative;background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden;display:block;transition:all .28s cubic-bezier(.16,1,.3,1)}
+    .restaurant-card:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:0 16px 48px rgba(0,0,0,.5),0 0 0 1px rgba(201,168,76,.15)}
+    .card-img{height:210px;overflow:hidden;position:relative}
+    .card-img img{width:100%;height:100%;object-fit:cover;transition:transform .4s cubic-bezier(.4,0,.2,1),filter .3s ease;filter:brightness(.75) saturate(.88);will-change:transform}
+    .restaurant-card:hover .card-img img{transform:scale(1.04);filter:brightness(.9) saturate(1.05)}
+    .card-emoji{position:absolute;bottom:14px;right:14px;font-size:2.4rem;filter:drop-shadow(0 4px 10px rgba(0,0,0,.6))}
+    .card-body{padding:24px 24px 28px}
+    .card-tag{display:inline-block;font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold-dim);padding:4px 12px;border-radius:2px;margin-bottom:10px}
+    .card-name{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:400;color:var(--cream);margin-bottom:6px;line-height:1.2}
+    .card-desc{font-size:.82rem;color:var(--cream-dim);line-height:1.65;margin-bottom:12px}
+    .card-scan-badge{display:inline-flex;align-items:center;gap:7px;font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;padding:7px 14px;border:1px solid rgba(201,168,76,.3);border-radius:2px;color:var(--gold);background:var(--gold-dim)}
+    .empty-state{grid-column:1/-1;text-align:center;padding:80px 40px;color:var(--cream-dim)}
+    .empty-state h3{font-family:'Cormorant Garamond',serif;font-size:2rem;color:var(--gold);margin-bottom:10px}
+    .skel{background:linear-gradient(90deg,#1a1815 25%,#252018 50%,#1a1815 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:3px}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+    /* CONTACT */
+    .contact-section{background:var(--ink2);border-top:1px solid #2a2520;padding:100px 60px}
+    .contact-inner{max-width:1200px;margin:0 auto}
+    .contact-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:64px;align-items:start;margin-top:48px}
+    .contact-info{display:flex;flex-direction:column;gap:28px}
+    .ci-item{display:flex;gap:18px;align-items:flex-start}
+    .ci-icon{width:46px;height:46px;border-radius:3px;background:var(--gold-dim);border:1px solid rgba(201,168,76,.25);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+    .ci-text h4{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--gold);margin-bottom:4px}
+    .ci-text p{font-size:.83rem;color:var(--cream-dim);line-height:1.65}
+    .ci-text a{color:var(--gold);text-decoration:none}
+    .ci-text a:hover{text-decoration:underline}
+    .contact-form{background:var(--ink);border:1px solid #2a2520;border-radius:6px;padding:40px}
+    .cf-heading{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--gold);margin-bottom:24px}
+    .cf-group{margin-bottom:16px}
+    .cf-label{display:block;font-size:.67rem;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+    .cf-input,.cf-textarea,.cf-select{width:100%;padding:11px 15px;background:#13110d;border:1px solid #3a3020;color:var(--cream);border-radius:3px;font-family:'Outfit',sans-serif;font-size:.9rem;transition:border-color .2s;outline:none}
+    .cf-input:focus,.cf-textarea:focus,.cf-select:focus{border-color:var(--gold)}
+    .cf-select option{background:#13110d}
+    .cf-textarea{resize:vertical;min-height:110px}
+    .cf-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .cf-submit{width:100%;padding:14px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .18s cubic-bezier(.4,0,.2,1);margin-top:4px}
+    .cf-submit:hover{background:var(--gold-light);transform:translateY(-1px)}
+    .cf-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .cf-success{display:none;text-align:center;padding:18px;background:rgba(76,175,125,.08);border:1px solid rgba(76,175,125,.3);border-radius:4px;color:#4caf7d;font-size:.88rem;margin-top:14px}
+    /* LOGIN ZONE */
+    .login-zone{border-top:1px solid #2a2520;padding:80px 60px;display:flex;flex-direction:column;align-items:center;gap:48px}
+    .login-zone-title{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:var(--cream);text-align:center}
+    .login-zone-title em{color:var(--gold);font-style:italic}
+    .login-cards{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;width:100%;max-width:800px}
+    .login-card{flex:1;min-width:280px;max-width:360px;background:var(--ink2);border:1px solid #2a2520;border-radius:8px;padding:36px 32px;text-align:center;text-decoration:none;transition:all .35s cubic-bezier(.16,1,.3,1)}
+    .login-card:hover{border-color:var(--gold);transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+    .login-card-icon{font-size:2.5rem;margin-bottom:16px;display:block}
+    .login-card-title{font-family:'Cormorant Garamond',serif;font-size:1.5rem;color:var(--gold);margin-bottom:8px}
+    .login-card-desc{font-size:.82rem;color:var(--cream-dim);line-height:1.65;margin-bottom:24px}
+    .login-card-btn{display:inline-block;padding:12px 28px;font-size:.75rem;font-weight:600;letter-spacing:.15em;text-transform:uppercase;border-radius:2px}
+    .login-card.owner .login-card-btn{background:var(--gold);color:var(--ink)}
+    .login-card.admin .login-card-btn{background:transparent;border:1px solid #3a3020;color:var(--cream-dim)}
+    footer{border-top:1px solid #2a2520;padding:26px 60px;display:flex;align-items:center;justify-content:space-between;background:var(--ink2)}
+    .footer-logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--gold);letter-spacing:.1em}
+    .footer-copy{font-size:.72rem;color:var(--cream-dim)}
+    @media(max-width:900px){.features{grid-template-columns:1fr}.why-grid{grid-template-columns:1fr}.stats-strip{grid-template-columns:repeat(2,1fr)}.contact-grid{grid-template-columns:1fr}.cf-row{grid-template-columns:1fr}}
+    @media(max-width:768px){
+      .restaurants-section,.section-wrap,.contact-section{padding:60px 20px}
+      .topnav{padding:14px 18px}
+      .nav-links{gap:18px}
+      .nav-links a{font-size:.72rem}
+      .login-zone{padding:60px 20px}
+      footer{flex-direction:column;gap:12px;text-align:center;padding:20px}
+      .hero-title{font-size:clamp(3.5rem,13vw,6rem)}
+      .stats-strip{padding:40px 20px}
+    }
+    @media(max-width:480px){
+      /* Nav — keep it tight, hide less-used links */
+      .topnav{padding:12px 16px}
+      .nav-logo{font-size:1.35rem;letter-spacing:.06em}
+      .nav-links{gap:12px}
+      .nav-links a{font-size:.68rem;letter-spacing:.05em}
+      .nav-links a:nth-child(3){display:none} /* hide Contact in tiny nav */
+      /* Hero */
+      .hero-eyebrow{font-size:.62rem;letter-spacing:.28em;margin-bottom:14px}
+      .hero-title{font-size:clamp(2.8rem,15vw,4rem);line-height:.9}
+      .hero-sub{font-size:.85rem;margin-top:16px;padding:0 8px;line-height:1.6}
+      .hero-ctas{margin-top:28px;gap:10px;flex-direction:column;align-items:center}
+      .hero-cta{padding:14px 32px;font-size:.78rem;width:220px;justify-content:center}
+      /* Features strip */
+      .feature{padding:32px 20px}
+      .feature-icon{font-size:2rem}
+      .feature h3{font-size:1.1rem}
+      .feature p{font-size:.82rem;line-height:1.7;color:rgba(240,232,213,0.72)}
+      /* Why grid */
+      .why-cell{padding:28px 18px}
+      .why-num{font-size:3rem}
+      .why-title{font-size:1.15rem}
+      .why-desc{font-size:.83rem;line-height:1.75;color:rgba(240,232,213,0.72)}
+      /* Stats */
+      .stats-strip{grid-template-columns:1fr 1fr;padding:28px 16px;gap:0}
+      .strip-stat{padding:16px 10px}
+      .strip-val{font-size:2.5rem}
+      .strip-label{font-size:.62rem;letter-spacing:.18em}
+      /* Section headers */
+      .section-label{font-size:.62rem;letter-spacing:.35em}
+      .section-title{font-size:clamp(1.9rem,7vw,2.5rem);margin-bottom:32px}
+      /* Restaurant cards */
+      .restaurant-grid{grid-template-columns:1fr}
+      .card-img{height:180px}
+      .card-name{font-size:1.3rem}
+      .card-desc{font-size:.8rem;color:rgba(240,232,213,0.72)}
+      .card-body{padding:18px 18px 22px}
+      /* Contact form */
+      .contact-form{padding:24px 16px}
+      .cf-heading{font-size:1.25rem}
+      .cf-label{font-size:.64rem}
+      .cf-input,.cf-textarea,.cf-select{font-size:.86rem;padding:10px 13px}
+      /* Login zone */
+      .login-zone-title{font-size:1.5rem}
+      .login-card{padding:24px 18px;min-width:0}
+      .login-card-icon{font-size:2rem}
+      .login-card-title{font-size:1.2rem}
+      .login-card-desc{font-size:.78rem;color:rgba(240,232,213,0.72);margin-bottom:18px}
+      .login-card-btn{padding:10px 22px;font-size:.72rem}
+      /* Footer */
+      .footer-logo{font-size:1.25rem}
+      .footer-copy{font-size:.68rem}
+    }
+  </style>
+</head>
+<body>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="topnav">
+    <a class="nav-logo" href="#">DISHIFY</a>
+    <div class="nav-links">
+      <a href="#restaurants">Restaurants</a>
+      <a href="#why">Why Dishify</a>
+      <a href="#contact">Contact</a>
+      <a href="#login-zone">Login</a>
+    </div>
+  </nav>
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow">✦ Redefining the Dining Experience</div>
+      <h1 class="hero-title">DISH<em>ify</em></h1>
+      <p class="hero-sub">Augmented reality menus, instant QR ordering, and real-time kitchen sync — all in one elegant platform.</p>
+      <div class="hero-ctas">
+        <a class="hero-cta primary" href="#restaurants">Our Restaurants</a>
+        <a class="hero-cta secondary" href="#contact">Get in Touch</a>
+      </div>
+    </div>
+    <div class="scroll-hint">Scroll</div>
+  </section>
+  <div class="features">
+    <div class="feature"><span class="feature-icon">🥽</span><h3>Augmented Reality</h3><p>See every dish in stunning 3D before you order. Place it on your table with your camera.</p></div>
+    <div class="feature"><span class="feature-icon">⚡</span><h3>Instant QR Menus</h3><p>No app required. Scan, browse and order instantly from your table.</p></div>
+    <div class="feature"><span class="feature-icon">✦</span><h3>Live Order Tracking</h3><p>Restaurant owners see every order the moment it lands — with real-time status updates.</p></div>
+  </div>
+  <section class="section-wrap" id="why">
+    <div class="section-label">✦ Why Choose Us</div>
+    <h2 class="section-title">The smarter way to <em>dine</em></h2>
+    <div class="why-grid">
+      <div class="why-cell"><div class="why-num">01</div><div class="why-title">No App Needed</div><p class="why-desc">Guests simply scan a QR code at the table. No download, no signup — just a seamless experience from the first tap.</p></div>
+      <div class="why-cell"><div class="why-num">02</div><div class="why-title">AR Food Preview</div><p class="why-desc">Interactive 3D models let guests visualise dishes in real scale before ordering. Reduce hesitation and boost upsells.</p></div>
+      <div class="why-cell"><div class="why-num">03</div><div class="why-title">Verified Table Orders</div><p class="why-desc">Orders are placed via QR scan at the table — ensuring every order is from a real diner physically at your venue.</p></div>
+      <div class="why-cell"><div class="why-num">04</div><div class="why-title">Per-Restaurant Branding</div><p class="why-desc">Each venue gets its own visual theme — colours, fonts, vibe — matching the restaurant's personality perfectly.</p></div>
+    </div>
+  </section>
+  <div class="stats-strip">
+    <div class="strip-stat"><div class="strip-val" id="live-restaurants">—</div><div class="strip-label">Restaurants Live</div></div>
+    <div class="strip-stat"><div class="strip-val" id="live-items">—</div><div class="strip-label">Menu Items</div></div>
+    <div class="strip-stat"><div class="strip-val" id="live-ar">—</div><div class="strip-label">AR Dishes</div></div>
+    <div class="strip-stat"><div class="strip-val">24/7</div><div class="strip-label">Live Support</div></div>
+  </div>
+  <!-- RESTAURANTS — display only, no ordering link -->
+  <section class="restaurants-section" id="restaurants">
+    <div class="section-label">✦ Participating Venues</div>
+    <h2 class="section-title">Our <em>Restaurants</em></h2>
+    <p style="font-size:.88rem;color:var(--cream-dim);margin-bottom:40px;line-height:1.7;max-width:560px">Visit any partner restaurant and scan the QR code at your table to browse the full AR menu and place your order.</p>
+    <div class="restaurant-grid" id="restaurants-list">
+      <div style="background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden"><div class="skel" style="height:210px"></div><div style="padding:24px"><div class="skel" style="height:12px;width:60px;margin-bottom:10px"></div><div class="skel" style="height:22px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:90%"></div></div></div>
+      <div style="background:var(--ink2);border:1px solid #2a2520;border-radius:4px;overflow:hidden"><div class="skel" style="height:210px"></div><div style="padding:24px"><div class="skel" style="height:12px;width:60px;margin-bottom:10px"></div><div class="skel" style="height:22px;width:70%;margin-bottom:8px"></div><div class="skel" style="height:12px;width:90%"></div></div></div>
+    </div>
+  </section>
+  <!-- CONTACT US -->
+  <section class="contact-section" id="contact">
+    <div class="contact-inner">
+      <div class="section-label">✦ Get In Touch</div>
+      <h2 class="section-title">Contact <em>Us</em></h2>
+      <div class="contact-grid">
+        <div class="contact-info">
+          <div class="ci-item"><div class="ci-icon">📧</div><div class="ci-text"><h4>Email Us</h4><p>For general inquiries and support:<br><a href="mailto:engineerhaadi@outlook.com">engineerhaadi@outlook.com</a></p></div></div>
+          <div class="ci-item"><div class="ci-icon">💼</div><div class="ci-text"><h4>Business &amp; Quotations</h4><p>Want Dishify for your restaurant? We offer custom packages with AR setup, menu management and onboarding support.</p></div></div>
+          <div class="ci-item"><div class="ci-icon">🤝</div><div class="ci-text"><h4>Partnerships</h4><p>Chains, cloud kitchens, food halls — let's talk about scaling Dishify across your entire operation.</p></div></div>
+          <div class="ci-item"><div class="ci-icon">⏱️</div><div class="ci-text"><h4>Response Time</h4><p>We reply to all inquiries within 24 hours on business days.</p></div></div>
+        </div>
+        <div class="contact-form">
+          <div class="cf-heading">Send a Message</div>
+          <div class="cf-row">
+            <div class="cf-group"><label class="cf-label">Your Name</label><input class="cf-input" id="cf-name" type="text" placeholder="Ahmad Khan"></div>
+            <div class="cf-group"><label class="cf-label">Phone / WhatsApp</label><input class="cf-input" id="cf-phone" type="tel" placeholder="+92 300 0000000"></div>
+          </div>
+          <div class="cf-group"><label class="cf-label">Email Address</label><input class="cf-input" id="cf-email" type="email" placeholder="you@restaurant.com"></div>
+          <div class="cf-group"><label class="cf-label">Inquiry Type</label>
+            <select class="cf-select" id="cf-type">
+              <option value="">Select inquiry type…</option>
+              <option value="quotation">Request a Quotation</option>
+              <option value="demo">Book a Demo</option>
+              <option value="partnership">Partnership Proposal</option>
+              <option value="support">Technical Support</option>
+              <option value="general">General Inquiry</option>
+            </select>
+          </div>
+          <div class="cf-group"><label class="cf-label">Message</label><textarea class="cf-textarea" id="cf-message" placeholder="Tell us about your restaurant, number of tables, any special requirements…"></textarea></div>
+          <button class="cf-submit" id="cf-submit" onclick="submitContact()">Send Message →</button>
+          <div class="cf-success" id="cf-success">✓ Message sent! We'll be in touch within 24 hours.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- LOGIN ZONE -->
+  <div class="login-zone" id="login-zone">
+    <div class="login-zone-title">Partner <em>Access</em></div>
+    <div class="login-cards">
+      <a class="login-card owner" href="owner.html"><span class="login-card-icon">🍽️</span><div class="login-card-title">Restaurant Login</div><p class="login-card-desc">Track live orders, manage order status, and view your daily stats. Each restaurant has its own secure access.</p><span class="login-card-btn">Go to Orders →</span></a>
+      <a class="login-card admin" href="admin.html"><span class="login-card-icon">⚙️</span><div class="login-card-title">Admin Dashboard</div><p class="login-card-desc">Add restaurants, manage menus, upload AR models, generate QR codes, and view platform-wide analytics.</p><span class="login-card-btn">Admin Panel →</span></a>
+    </div>
+  </div>
+  <footer>
+    <div class="footer-logo">DISHIFY</div>
+    <div class="footer-copy">© 2025 Dishify · <a href="mailto:engineerhaadi@outlook.com" style="color:var(--gold);text-decoration:none">engineerhaadi@outlook.com</a></div>
+  </footer>
+  <script>
+    const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
+    firebase.initializeApp(firebaseConfig);
+    const cuisineImages={'Italian':'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=80','Pakistani':'https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=600&q=80','Japanese':'https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=600&q=80','American':'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80','Chinese':'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&q=80','Mexican':'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=80','Turkish':'https://images.unsplash.com/photo-1608158374781-4541f87ee36a?w=600&q=80','Thai':'https://images.unsplash.com/photo-1562565652-a0d8f0c59eb4?w=600&q=80','default':'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80'};
+    firebase.database().ref('restaurants').on('value',snap=>{
+      const data=snap.val()||{},keys=Object.keys(data),list=document.getElementById('restaurants-list');
+      let items=0,ar=0;
+      keys.forEach(k=>{if(data[k].menu)Object.values(data[k].menu).forEach(m=>{items++;if(m.model)ar++;})});
+      document.getElementById('live-restaurants').textContent=keys.length||'0';
+      document.getElementById('live-items').textContent=items||'0';
+      document.getElementById('live-ar').textContent=ar||'0';
+      if(!keys.length){list.innerHTML='<div class="empty-state"><h3>Coming Soon</h3><p>Restaurants are being onboarded. Check back soon!</p></div>';return;}
+      list.innerHTML=keys.map(key=>{
+        const r=data[key];
+        const img=r.photo||(r.cuisine&&cuisineImages[r.cuisine])||cuisineImages['default'];
+        return `<div class="restaurant-card">
+          <div class="card-img"><img src="${img}" alt="${r.name}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80'"><div class="card-emoji">${r.emoji||'🍽️'}</div></div>
+          <div class="card-body">
+            <span class="card-tag">${r.cuisine||'Fine Dining'}</span>
+            <h3 class="card-name">${r.name}</h3>
+            <p class="card-desc">${r.description||'Exceptional cuisine crafted with passion.'}</p>
+            <div class="card-scan-badge">📱 Scan QR at your table to order</div>
+          </div>
+        </div>`;
+      }).join('');
+    });
+    function submitContact(){
+      const name=document.getElementById('cf-name').value.trim(),email=document.getElementById('cf-email').value.trim(),msg=document.getElementById('cf-message').value.trim();
+      if(!name||!email||!msg){alert('Please fill in Name, Email and Message.');return;}
+      const btn=document.getElementById('cf-submit');btn.disabled=true;btn.textContent='Sending…';
+      firebase.database().ref('inquiries').push({name,phone:document.getElementById('cf-phone').value.trim(),email,type:document.getElementById('cf-type').value,message:msg,timestamp:Date.now(),timestampStr:new Date().toLocaleString('en-PK',{timeZone:'Asia/Karachi'})})
+      .then(()=>{document.getElementById('cf-success').style.display='block';btn.textContent='Sent ✓';['cf-name','cf-phone','cf-email','cf-message'].forEach(id=>document.getElementById(id).value='');document.getElementById('cf-type').value='';})
+      .catch(()=>{btn.disabled=false;btn.textContent='Send Message →';alert('Failed to send. Email us directly at engineerhaadi@outlook.com');});
+    }
+    // ── CURSOR (desktop only, butter-smooth RAF loop) ──
+    (function(){
+      const isTouchOnly=window.matchMedia('(hover:none)').matches;
+      const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+      if(!cur||!ring)return;
+      if(isTouchOnly){cur.style.display='none';ring.style.display='none';return;}
+      document.body.style.cursor='none';
+      let mx=0,my=0,rx=0,ry=0;
+      document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;},{passive:true});
+      function tick(){
+        cur.style.transform=`translate(${mx}px,${my}px) translate(-50%,-50%)`;
+        rx+=(mx-rx)*.18;ry+=(my-ry)*.18;
+        ring.style.transform=`translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
