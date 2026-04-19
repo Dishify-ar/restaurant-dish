@@ -9,7 +9,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
+  <script>window.AFRAME_DISABLE_AUTO_INIT=true;</script>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1045,28 +1047,48 @@ service firebase.storage {
       const progressLabel = document.getElementById('compile-progress-label');
       const resultEl = document.getElementById('compile-result');
 
-      // Check MindAR compiler is loaded
-      if(!window.MINDAR || !window.MINDAR.IMAGE || !window.MINDAR.IMAGE.Compiler){
-        resultEl.style.display='block';
-        resultEl.innerHTML='<span style="color:#bf4040">⚠ MindAR compiler not loaded yet. Please wait a moment and try again.</span>';
-        return;
-      }
-
-      if(!_markerImageEl){
-        resultEl.style.display='block';
-        resultEl.innerHTML='<span style="color:#bf4040">⚠ Marker image not ready. Please wait a second and try again.</span>';
-        return;
-      }
-
       btn.disabled = true;
+      btn.textContent = '⏳ Loading compiler…';
+      resultEl.style.display = 'none';
+
+      // Poll until A-Frame + MindAR bundle has fully initialised (loads async)
+      const CompilerClass = await new Promise((resolve) => {
+        let attempts = 0;
+        const check = () => {
+          if (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler) {
+            resolve(window.MINDAR.IMAGE.Compiler);
+          } else if (++attempts > 50) {
+            resolve(null); // give up after ~10s
+          } else {
+            setTimeout(check, 200);
+          }
+        };
+        check();
+      });
+
+      if (!CompilerClass) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Compile & Activate AR';
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Compiler failed to load. Check your internet connection and refresh the page.</span>';
+        return;
+      }
+
+      if (!_markerImageEl) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Compile & Activate AR';
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Marker image not ready. Please wait a second and try again.</span>';
+        return;
+      }
+
       btn.textContent = '⏳ Compiling…';
       progressWrap.style.display = 'block';
       progressBar.style.width = '0%';
       progressLabel.textContent = 'Initialising compiler…';
-      resultEl.style.display = 'none';
 
       try {
-        const compiler = new window.MINDAR.IMAGE.Compiler();
+        const compiler = new CompilerClass();
 
         // compileImageTargets fires a progress callback (0–1)
         await compiler.compileImageTargets([_markerImageEl], (progress) => {
