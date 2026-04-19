@@ -1030,6 +1030,7 @@ service firebase.storage {
           ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256);
           ctx.drawImage(img, (256-w)/2, (256-h)/2, w, h);
           _markerImageEl = img;
+          _markerImageEl.dataset.source = 'custom';
 
           // Warn if this looks like a logo (too smooth, not a good AR marker)
           const resultEl = document.getElementById('compile-result');
@@ -1057,6 +1058,18 @@ service firebase.storage {
       btn.disabled = true;
       btn.textContent = '⏳ Loading compiler…';
       resultEl.style.display = 'none';
+
+      // FIX: Always redraw the canvas at click-time when using the default marker.
+      // The DOMContentLoaded draw ran while #admin-app was display:none, so
+      // toDataURL() returned a blank image → zero features → compiler hung forever.
+      if (!_markerImageEl || _markerImageEl.dataset.source !== 'custom') {
+        _markerImageEl = null;
+        drawMarkerCanvas();
+        await new Promise(resolve => {
+          const t = setInterval(() => { if (_markerImageEl) { clearInterval(t); resolve(); } }, 20);
+          setTimeout(() => { clearInterval(t); resolve(); }, 2000);
+        });
+      }
 
       // Poll until A-Frame + MindAR bundle has fully initialised (loads async)
       const CompilerClass = await new Promise((resolve) => {
