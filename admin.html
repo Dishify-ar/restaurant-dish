@@ -1111,7 +1111,7 @@ service firebase.storage {
       // Attempt to init TF backend with a 3 s timeout — never block compile
       try {
         const tf = window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE._tf;
-        if (tf) await Promise.race([tf.setBackend('cpu'), new Promise(r=>setTimeout(r,3000))]);
+        if (tf) await Promise.race([tf.setBackend('webgl'), new Promise(r=>setTimeout(r,3000))]);
       } catch(e) { /* continue regardless */ }
 
       btn.textContent = '⏳ Compiling…';
