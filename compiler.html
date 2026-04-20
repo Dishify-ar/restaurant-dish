@@ -6,18 +6,57 @@
   <title>Dishify — AR Compiler</title>
 
   <!--
-    Load TF.js FIRST so it can claim a WebGL context before anything else.
-    Then load MindAR's standalone image bundle (no A-Frame).
-    The A-Frame bundle is intentionally NOT used here because A-Frame initialises
-    its own renderer on load and fights TF.js for the WebGL context, causing
-    compileImageTargets() to hang indefinitely.
+    STRATEGY
+    ════════
+    The only MindAR bundle that (a) works as a plain <script> tag AND
+    (b) exposes window.MINDAR.IMAGE.Compiler is mindar-image-aframe.prod.js.
 
-    The standalone mindar-image.prod.js DOES expose window.MINDAR.IMAGE.Compiler
-    when TF.js is already loaded — the class just wasn't reachable before because
-    TF.js wasn't present as a separate script.
+    Problem: A-Frame auto-scans the DOM on DOMContentLoaded and initialises a
+    WebGL renderer for every <a-scene> it finds. That renderer conflicts with
+    TF.js's own WebGL backend, causing compileImageTargets() to hang forever.
+
+    Solution:
+      1. Stub out window.AFRAME with no-op registration methods BEFORE the
+         bundle loads. The bundle will call registerSystem/registerComponent/etc.
+         and get no-ops — so A-Frame "loads" but never spins up a scene.
+      2. Keep NO <a-scene> element anywhere in this document.
+      3. Load TF.js core + webgl backend BEFORE MindAR, then explicitly call
+         tf.setBackend('webgl') + tf.ready() before compiling so TF.js owns the
+         WebGL context from the start.
   -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
+
+  <!-- TF.js pieces loaded in order (core → webgl → cpu fallback) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.20.0/dist/tf-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.20.0/dist/tf-backend-webgl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu@4.20.0/dist/tf-backend-cpu.min.js"></script>
+
+  <!-- Stub A-Frame BEFORE mindar-image-aframe.prod.js runs -->
+  <script>
+    (function stubAFrame() {
+      const noop = () => {};
+      const noopObj = { registerSystem: noop, registerComponent: noop,
+                        registerGeometry: noop, registerShader: noop,
+                        registerPrimitive: noop, registerElement: noop,
+                        systems: {}, components: {}, scenes: [],
+                        utils: {
+                          deepEqual: () => false,
+                          diff: () => ({}),
+                          coordinates: { isCoordinates: () => false, parse: v => v, stringify: v => v }
+                        },
+                        schema: { process: s => s },
+                        THREE: window.THREE || null };
+      // Only stub if A-Frame hasn't already booted (shouldn't be, but be safe)
+      if (!window.AFRAME || !window.AFRAME._dishifyStubbed) {
+        window.AFRAME = noopObj;
+        window.AFRAME._dishifyStubbed = true;
+      }
+    })();
+  </script>
+
+  <!-- MindAR A-Frame bundle — exposes window.MINDAR.IMAGE.Compiler -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
@@ -28,34 +67,28 @@
     body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 20px;gap:28px}
 
     .logo{font-family:Georgia,serif;font-size:1.6rem;font-weight:300;color:var(--gold);letter-spacing:.25em}
-
     .card{background:#0e0d0a;border:1px solid rgba(201,168,76,.3);border-radius:6px;padding:28px 32px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:18px}
-
     .title{font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
 
-    /*
-      The WebGL canvas MUST remain visible in the DOM so TF.js can
-      acquire a WebGL context. Keep it as a thin decorative stripe.
-    */
-    /* TF.js needs a real visible canvas — too small and the GPU compositor skips it */
-    #gl-canvas{display:block;width:100%;height:32px;border-radius:4px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.18)}
+    #marker-preview{width:120px;height:120px;border:2px solid rgba(201,168,76,.35);border-radius:4px;background:#fff;align-self:center}
+
+    /* Must be visible + large enough for the GPU compositor to allocate WebGL memory */
+    #gl-canvas{display:block;width:100%;height:48px;border-radius:4px;background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.14)}
 
     .progress-wrap{display:none;flex-direction:column;gap:6px}
     .progress-label{font-size:.72rem;color:var(--cream-dim);letter-spacing:.1em}
     .progress-track{height:4px;background:rgba(201,168,76,.12);border-radius:2px;overflow:hidden}
-    .progress-bar{height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width .25s ease}
+    .progress-bar{height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width .3s ease}
 
-    .status{font-size:.82rem;line-height:1.7;display:none;white-space:pre-line}
+    .status{font-size:.82rem;line-height:1.8;display:none;white-space:pre-line}
     .status.show{display:block}
     .status.ok{color:var(--green)}
     .status.err{color:var(--red)}
     .status.warn{color:#e0a020}
 
-    .close-btn{display:none;padding:11px 22px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;align-self:flex-start;transition:opacity .15s}
+    .close-btn{display:none;padding:11px 22px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;align-self:flex-start}
     .close-btn:hover{opacity:.85}
     .close-btn.show{display:block}
-
-    #marker-preview{width:120px;height:120px;border:2px solid rgba(201,168,76,.35);border-radius:4px;background:#fff;align-self:center}
   </style>
 </head>
 <body>
@@ -64,10 +97,16 @@
   <div class="card">
     <div class="title">🎯 AR Marker Compiler</div>
 
+    <!-- The marker image that will be compiled into a .mind target -->
     <canvas id="marker-preview" width="256" height="256"></canvas>
 
-    <!-- TF.js WebGL context anchor — must be visible and large enough for GPU allocation -->
-    <canvas id="gl-canvas" width="256" height="32"></canvas>
+    <!--
+      TF.js WebGL anchor canvas.
+      • No <a-scene> exists in this document — A-Frame has nothing to boot.
+      • This canvas must stay visible and large enough for the GPU to
+        allocate a real hardware-accelerated WebGL context.
+    -->
+    <canvas id="gl-canvas" width="512" height="48"></canvas>
 
     <div class="progress-wrap" id="progress-wrap">
       <div class="progress-label" id="progress-label">Starting…</div>
@@ -80,197 +119,166 @@
 
   <script>
     // ── Firebase ──────────────────────────────────────────────────────────────
-    const firebaseConfig = {
-      apiKey: "AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",
-      authDomain: "dishify-menu.firebaseapp.com",
-      databaseURL: "https://dishify-menu-default-rtdb.firebaseio.com",
-      projectId: "dishify-menu",
-      storageBucket: "dishify-menu.firebasestorage.app",
-      messagingSenderId: "182873179650",
-      appId: "1:182873179650:web:8ff8cf3c04789d9f7b091b"
-    };
-    firebase.initializeApp(firebaseConfig);
+    firebase.initializeApp({
+      apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",
+      authDomain:"dishify-menu.firebaseapp.com",
+      databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",
+      projectId:"dishify-menu",
+      storageBucket:"dishify-menu.firebasestorage.app",
+      messagingSenderId:"182873179650",
+      appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"
+    });
     const db = firebase.database();
 
     // ── UI helpers ────────────────────────────────────────────────────────────
-    const progressWrap = document.getElementById('progress-wrap');
-    const progressBar  = document.getElementById('progress-bar');
-    const progressLbl  = document.getElementById('progress-label');
-    const statusEl     = document.getElementById('status');
-    const closeBtn     = document.getElementById('close-btn');
+    const $pw  = document.getElementById('progress-wrap');
+    const $pb  = document.getElementById('progress-bar');
+    const $pl  = document.getElementById('progress-label');
+    const $st  = document.getElementById('status');
+    const $btn = document.getElementById('close-btn');
 
     function setProgress(pct, label) {
-      progressWrap.style.display = 'flex';
-      progressBar.style.width = pct + '%';
-      progressLbl.textContent = label;
+      $pw.style.display = 'flex';
+      $pb.style.width = pct + '%';
+      $pl.textContent = label;
     }
     function setStatus(msg, type = 'ok') {
-      statusEl.textContent = msg;
-      statusEl.className = 'status show ' + type;
+      $st.textContent = msg;
+      $st.className = 'status show ' + type;
     }
     function done(msg) {
       setStatus(msg, 'ok');
-      closeBtn.classList.add('show');
+      $btn.classList.add('show');
       if (window.opener) {
-        try { window.opener.postMessage({ type: 'DISHIFY_COMPILED' }, '*'); } catch(e) {}
+        try { window.opener.postMessage({ type:'DISHIFY_COMPILED' }, '*'); } catch(e) {}
       }
     }
     function fail(msg) {
       setStatus('⚠ ' + msg, 'err');
-      closeBtn.classList.add('show');
+      $btn.classList.add('show');
     }
 
-    // ── Draw the Dishify marker onto the preview canvas ───────────────────────
+    // ── Draw the Dishify AR marker onto a canvas ──────────────────────────────
     function drawMarker(canvas) {
       const ctx = canvas.getContext('2d');
-      const s = 256;
-      const fr = (x, y, w, h, c = '#000') => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, s, s);
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 10; ctx.strokeRect(10, 10, 236, 236);
-      // Corner finders
-      fr(20, 20, 45, 45); fr(27, 27, 30, 30, '#fff'); fr(34, 34, 17, 17);
-      fr(191, 20, 45, 45); fr(198, 27, 30, 30, '#fff'); fr(205, 34, 17, 17);
-      fr(20, 191, 45, 45); fr(27, 198, 30, 30, '#fff'); fr(34, 205, 17, 17);
-      // Bullseye
-      ctx.beginPath(); ctx.arc(128, 128, 35, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill();
-      ctx.beginPath(); ctx.arc(128, 128, 25, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
-      ctx.beginPath(); ctx.arc(128, 128, 15, 0, Math.PI * 2); ctx.fillStyle = '#000'; ctx.fill();
-      // Ticks
-      ctx.strokeStyle = '#000'; ctx.lineWidth = 5;
+      const fr = (x,y,w,h,c='#000') => { ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256);
+      ctx.strokeStyle='#000'; ctx.lineWidth=10; ctx.strokeRect(10,10,236,236);
+      fr(20,20,45,45); fr(27,27,30,30,'#fff'); fr(34,34,17,17);
+      fr(191,20,45,45); fr(198,27,30,30,'#fff'); fr(205,34,17,17);
+      fr(20,191,45,45); fr(27,198,30,30,'#fff'); fr(34,205,17,17);
+      ctx.beginPath(); ctx.arc(128,128,35,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+      ctx.beginPath(); ctx.arc(128,128,25,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(128,128,15,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+      ctx.strokeStyle='#000'; ctx.lineWidth=5;
       [[128,77,128,87],[128,169,128,179],[77,128,87,128],[169,128,179,128]]
-        .forEach(([x1,y1,x2,y2]) => { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); });
-      // Inner grid dots
+        .forEach(([x1,y1,x2,y2])=>{ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); });
       [[80,80],[98,80],[149,80],[167,80],[80,98],[167,98],
        [80,149],[167,149],[80,167],[98,167],[149,167],[167,167]]
-        .forEach(([x,y]) => fr(x, y, 9, 9));
+        .forEach(([x,y])=>fr(x,y,9,9));
     }
 
-    // ── Check for custom marker passed via sessionStorage ─────────────────────
+    // ── Load optional custom marker from sessionStorage ───────────────────────
     function getMarkerImage() {
       return new Promise(resolve => {
         const stored = sessionStorage.getItem('dishify_marker_src');
-        if (stored) {
-          sessionStorage.removeItem('dishify_marker_src');
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => resolve(null);
-          img.src = stored;
-          return;
-        }
-        resolve(null);
+        if (!stored) { resolve(null); return; }
+        sessionStorage.removeItem('dishify_marker_src');
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = stored;
       });
     }
 
-    // ── Wait for MindAR Compiler to be available on window ───────────────────
-    // FIX: Poll for up to 30 seconds (150 × 200 ms).
-    //      Also probe multiple possible namespace paths since the A-Frame
-    //      bundle may attach the class at slightly different locations
-    //      depending on load order.
-    function waitForCompiler() {
+    // ── Poll for window.MINDAR.IMAGE.Compiler ─────────────────────────────────
+    function waitForCompiler(timeoutMs = 15000) {
       return new Promise(resolve => {
-        let tries = 0;
-        const MAX = 150; // 30 seconds
-
+        const deadline = Date.now() + timeoutMs;
         const check = () => {
-          // Primary path (A-Frame bundle)
-          const c =
-            (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler) ||
-            // Fallback paths sometimes present in different build configs
-            (window.MindARThree && window.MindARThree.Compiler) ||
-            null;
-
-          if (c) {
-            console.log('[Dishify] Compiler found:', c);
-            resolve(c);
-            return;
+          const C = window.MINDAR?.IMAGE?.Compiler;
+          if (C) { console.log('[Dishify] Compiler ready:', C); resolve(C); return; }
+          if (Date.now() > deadline) {
+            console.warn('[Dishify] Timeout. MINDAR =', window.MINDAR,
+                         ' | AFRAME =', window.AFRAME?._dishifyStubbed ? 'stubbed-ok' : window.AFRAME);
+            resolve(null); return;
           }
-
-          if (++tries >= MAX) {
-            // Log what IS on window for debugging
-            console.warn('[Dishify] Timed out. window.MINDAR =', window.MINDAR);
-            resolve(null);
-            return;
-          }
-
-          // Every 5 seconds, log current state so the developer can see progress
-          if (tries % 25 === 0) {
-            console.log(`[Dishify] Still waiting… (${tries * 200 / 1000}s) window.MINDAR =`, window.MINDAR);
-          }
-
-          setTimeout(check, 200);
+          setTimeout(check, 100);
         };
-
         check();
       });
     }
 
-    // ── Main compile flow ─────────────────────────────────────────────────────
+    // ── Main compile pipeline ─────────────────────────────────────────────────
     async function compile() {
+
+      // 1 — Draw marker
       const markerCanvas = document.getElementById('marker-preview');
       drawMarker(markerCanvas);
 
-      setProgress(0, 'Loading marker…');
+      // 2 — Optional custom marker
+      setProgress(2, 'Loading marker…');
       const customImg = await getMarkerImage();
       if (customImg) {
         const ctx = markerCanvas.getContext('2d');
-        ctx.clearRect(0, 0, 256, 256);
-        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 256, 256);
-        const sc = Math.min(256 / customImg.width, 256 / customImg.height);
-        const w = customImg.width * sc, h = customImg.height * sc;
-        ctx.drawImage(customImg, (256 - w) / 2, (256 - h) / 2, w, h);
-        setStatus('Using custom marker image', 'warn');
+        ctx.clearRect(0,0,256,256);
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256);
+        const sc = Math.min(256/customImg.width, 256/customImg.height);
+        ctx.drawImage(customImg, (256-customImg.width*sc)/2, (256-customImg.height*sc)/2,
+                      customImg.width*sc, customImg.height*sc);
+        setStatus('Using custom marker image','warn');
       }
 
-      setProgress(2, 'Waiting for MindAR compiler…');
+      // 3 — Wait for MindAR compiler class
+      setProgress(5, 'Loading MindAR…');
       const CompilerClass = await waitForCompiler();
-
       if (!CompilerClass) {
         fail(
-          'MindAR compiler not found after 30 seconds.\n\n' +
-          'Possible causes:\n' +
-          '• The CDN script was blocked (try disabling extensions)\n' +
-          '• An ad-blocker or privacy extension is blocking jsdelivr.net\n' +
-          '• The page loaded before the script finished\n\n' +
-          'Try: open browser console → check for red script errors → reload.'
+          'MindAR compiler not found.\n\n' +
+          'Likely cause: the mindar-image-aframe.prod.js script\n' +
+          'was blocked by an extension or network filter.\n\n' +
+          '→ Open DevTools (F12) → Console tab\n' +
+          '→ Look for a red network error for cdn.jsdelivr.net\n' +
+          '→ Try opening this page in a private/incognito window\n' +
+          '→ Or disable browser extensions and reload.'
         );
         return;
       }
 
-      setProgress(5, 'Compiler ready — starting…');
-
-      // Warm up TF.js WebGL backend BEFORE calling compileImageTargets.
-      // Without this, TF.js lazily initialises its backend inside the compile
-      // call, sometimes picking CPU instead of WebGL and hanging forever.
+      // 4 — Initialise TF.js WebGL backend before compile
+      setProgress(8, 'Initialising GPU…');
       try {
         await tf.setBackend('webgl');
         await tf.ready();
-        console.log('[Dishify] TF.js backend ready:', tf.getBackend());
+        console.log('[Dishify] TF backend:', tf.getBackend());
       } catch(e) {
-        console.warn('[Dishify] TF.js WebGL warm-up failed, trying cpu:', e);
-        await tf.setBackend('cpu');
-        await tf.ready();
+        console.warn('[Dishify] WebGL backend failed, trying CPU:', e);
+        try { await tf.setBackend('cpu'); await tf.ready(); } catch(_) {}
       }
 
+      // 5 — Compile
+      setProgress(10, 'Compiling AR target…');
       try {
         const compiler = new CompilerClass();
 
-        await compiler.compileImageTargets([markerCanvas], (progress) => {
-          const pct = Math.round(5 + progress * 0.9);
-          setProgress(pct, 'Compiling… ' + Math.round(progress) + '%');
+        await compiler.compileImageTargets([markerCanvas], pct => {
+          setProgress(Math.round(10 + pct * 0.85), 'Compiling… ' + Math.round(pct) + '%');
         });
 
-        setProgress(96, 'Exporting…');
+        // 6 — Export
+        setProgress(96, 'Exporting data…');
         const buffer = compiler.exportData();
 
-        setProgress(98, 'Encoding…');
+        // 7 — Base64 encode (chunked to avoid stack overflow)
+        setProgress(97, 'Encoding…');
         const bytes = new Uint8Array(buffer);
         let binary = '';
         const CHUNK = 8192;
-        for (let i = 0; i < bytes.length; i += CHUNK) {
+        for (let i = 0; i < bytes.length; i += CHUNK)
           binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
-        }
         const dataUrl = 'data:application/octet-stream;base64,' + btoa(binary);
 
+        // 8 — Save to Firebase
         setProgress(99, 'Saving to Firebase…');
         await db.ref('config/globalMindTarget').set({
           url: dataUrl,
@@ -283,7 +291,7 @@
 
       } catch(err) {
         console.error('[Dishify] Compile error:', err);
-        fail('Compilation failed: ' + (err.message || err));
+        fail('Compilation failed:\n' + (err.message || String(err)));
       }
     }
 
