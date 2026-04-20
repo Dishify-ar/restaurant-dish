@@ -373,19 +373,32 @@
         return;
       }
 
-      // 4 — Check TF.js (bundled inside the patched JS)
-      setProgress(8, 'Checking GPU backend…');
-      try {
-        const tfRef = window.MINDAR.IMAGE._tf || window.tf;
-        if (tfRef) {
-          dbg('TF backend:', tfRef.getBackend?.() || 'unknown');
-        } else {
-          dbg('TF ref not directly accessible (normal — bundled internally)');
+      // 4 — Force WebGL backend for fast GPU compilation
+      setProgress(8, 'Initialising GPU backend…');
+      const tfRef = window.MINDAR.IMAGE._tf || window.tf;
+      if (tfRef) {
+        try {
+          dbg('Current TF backend:', tfRef.getBackend?.() || 'none');
+          if (tfRef.getBackend?.() !== 'webgl') {
+            dbg('Switching to WebGL…');
+            await tfRef.setBackend('webgl');
+            await tfRef.ready();
+            dbg('TF backend after switch:', tfRef.getBackend?.());
+          } else {
+            dbg('WebGL already active ✓');
+          }
+        } catch(e) {
+          dbg('WebGL switch failed, staying on:', tfRef.getBackend?.() || 'cpu', '—', e.message);
+          dbg('(CPU mode works but is slower — ~2-3 min)');
         }
-      } catch(e) { dbg('TF check skipped:', e.message); }
+      } else {
+        dbg('TF ref not accessible externally — backend set internally');
+      }
 
       // 5 — Compile
       setProgress(10, 'Compiling AR target… 0%');
+      const isCpu = tfRef?.getBackend?.() === 'cpu';
+      if (isCpu) setStatus('Running on CPU — may take 2–3 min. Please wait…', 'warn');
       dbg('Starting compileImageTargets…');
 
       let buffer;
