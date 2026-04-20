@@ -6,12 +6,18 @@
   <title>Dishify — AR Compiler</title>
 
   <!--
-    FIX: Use the A-Frame bundle instead of the plain image bundle.
-    Only mindar-image-aframe.prod.js exposes window.MINDAR.IMAGE.Compiler
-    on the global scope. The plain mindar-image.prod.js does NOT expose
-    the Compiler class at window.MINDAR — it only sets up internal modules.
+    Load TF.js FIRST so it can claim a WebGL context before anything else.
+    Then load MindAR's standalone image bundle (no A-Frame).
+    The A-Frame bundle is intentionally NOT used here because A-Frame initialises
+    its own renderer on load and fights TF.js for the WebGL context, causing
+    compileImageTargets() to hang indefinitely.
+
+    The standalone mindar-image.prod.js DOES expose window.MINDAR.IMAGE.Compiler
+    when TF.js is already loaded — the class just wasn't reachable before because
+    TF.js wasn't present as a separate script.
   -->
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
@@ -31,7 +37,8 @@
       The WebGL canvas MUST remain visible in the DOM so TF.js can
       acquire a WebGL context. Keep it as a thin decorative stripe.
     */
-    #gl-canvas{display:block;width:100%;height:6px;border-radius:3px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15)}
+    /* TF.js needs a real visible canvas — too small and the GPU compositor skips it */
+    #gl-canvas{display:block;width:100%;height:32px;border-radius:4px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.18)}
 
     .progress-wrap{display:none;flex-direction:column;gap:6px}
     .progress-label{font-size:.72rem;color:var(--cream-dim);letter-spacing:.1em}
@@ -59,8 +66,8 @@
 
     <canvas id="marker-preview" width="256" height="256"></canvas>
 
-    <!-- Must stay visible for WebGL context creation -->
-    <canvas id="gl-canvas" width="4" height="4"></canvas>
+    <!-- TF.js WebGL context anchor — must be visible and large enough for GPU allocation -->
+    <canvas id="gl-canvas" width="256" height="32"></canvas>
 
     <div class="progress-wrap" id="progress-wrap">
       <div class="progress-label" id="progress-label">Starting…</div>
@@ -230,6 +237,19 @@
       }
 
       setProgress(5, 'Compiler ready — starting…');
+
+      // Warm up TF.js WebGL backend BEFORE calling compileImageTargets.
+      // Without this, TF.js lazily initialises its backend inside the compile
+      // call, sometimes picking CPU instead of WebGL and hanging forever.
+      try {
+        await tf.setBackend('webgl');
+        await tf.ready();
+        console.log('[Dishify] TF.js backend ready:', tf.getBackend());
+      } catch(e) {
+        console.warn('[Dishify] TF.js WebGL warm-up failed, trying cpu:', e);
+        await tf.setBackend('cpu');
+        await tf.ready();
+      }
 
       try {
         const compiler = new CompilerClass();
