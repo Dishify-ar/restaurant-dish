@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="mindar-image-patched.js?v=4"></script>
+  <!-- compiler.html handles MindAR loading in its own tab -->
   <style>
     :root{--gold:#c9a84c;--gold-light:#e8c97a;--gold-dim:rgba(201,168,76,0.12);--ink:#070604;--ink2:#0e0d0a;--ink3:#181510;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,0.55);--green:#4caf7d;--red:#bf4040}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -530,17 +530,13 @@ service firebase.storage {
             </div>
           </div>
 
-          <!-- Compile button + progress -->
+          <!-- Compile button — opens dedicated compiler.html in a new tab -->
           <div style="display:flex;flex-direction:column;gap:12px;max-width:420px">
             <button id="compile-activate-btn" class="btn btn-gold" onclick="compileAndActivate()" style="font-size:.85rem;padding:13px 24px;letter-spacing:.12em">
               ⚡ Compile &amp; Activate AR
             </button>
-            <!-- Progress bar -->
-            <div id="compile-progress-wrap" style="display:none">
-              <div style="font-size:.72rem;color:var(--cream-dim);margin-bottom:6px;letter-spacing:.1em" id="compile-progress-label">Compiling…</div>
-              <div style="height:4px;background:rgba(201,168,76,.15);border-radius:2px;overflow:hidden">
-                <div id="compile-progress-bar" style="height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width .2s ease"></div>
-              </div>
+            <div style="font-size:.74rem;color:var(--cream-dim);line-height:1.65">
+              Opens a new tab to compile the marker — keep it in the foreground until it closes itself.
             </div>
             <div id="compile-result" style="display:none;font-size:.78rem;line-height:1.6"></div>
           </div>
@@ -1048,153 +1044,89 @@ service firebase.storage {
       reader.readAsDataURL(file);
     }
 
-    async function compileAndActivate(){
+    function compileAndActivate(){
       const btn = document.getElementById('compile-activate-btn');
-      const progressWrap = document.getElementById('compile-progress-wrap');
-      const progressBar = document.getElementById('compile-progress-bar');
-      const progressLabel = document.getElementById('compile-progress-label');
       const resultEl = document.getElementById('compile-result');
-
-      btn.disabled = true;
-      btn.textContent = '⏳ Loading compiler…';
       resultEl.style.display = 'none';
 
-      // FIX: Always redraw the canvas at click-time when using the default marker.
-      // The DOMContentLoaded draw ran while #admin-app was display:none, so
-      // toDataURL() returned a blank image → zero features → compiler hung forever.
-      if (!_markerImageEl || _markerImageEl.dataset.source !== 'custom') {
-        _markerImageEl = null;
-        drawMarkerCanvas();
-        await new Promise(resolve => {
-          const t = setInterval(() => { if (_markerImageEl) { clearInterval(t); resolve(); } }, 20);
-          setTimeout(() => { clearInterval(t); resolve(); }, 2000);
-        });
+      // If a custom marker was uploaded, pass it to the compiler page via sessionStorage
+      // (sessionStorage is shared between same-origin tabs opened via window.open)
+      if (_markerImageEl && _markerImageEl.dataset && _markerImageEl.dataset.source === 'custom') {
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = 256; tmpCanvas.height = 256;
+        const ctx = tmpCanvas.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,256,256);
+        const sc = Math.min(256/_markerImageEl.width, 256/_markerImageEl.height);
+        const w = _markerImageEl.width*sc, h = _markerImageEl.height*sc;
+        ctx.drawImage(_markerImageEl,(256-w)/2,(256-h)/2,w,h);
+        sessionStorage.setItem('dishify_marker_src', tmpCanvas.toDataURL('image/png'));
+      } else {
+        sessionStorage.removeItem('dishify_marker_src');
       }
 
-      // Poll until A-Frame + MindAR bundle has fully initialised (loads async)
-      const CompilerClass = await new Promise((resolve) => {
-        let attempts = 0;
-        const check = () => {
-          if (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler) {
-            resolve(window.MINDAR.IMAGE.Compiler);
-          } else if (++attempts > 50) {
-            resolve(null); // give up after ~10s
-          } else {
-            setTimeout(check, 200);
-          }
-        };
-        check();
-      });
-
-      if (!CompilerClass) {
-        btn.disabled = false;
-        btn.textContent = '⚡ Compile & Activate AR';
+      // Open the dedicated compiler page in a new foreground tab
+      const compilerTab = window.open('compiler.html', '_blank');
+      if (!compilerTab) {
         resultEl.style.display = 'block';
-        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Compiler failed to load. Check your internet connection and refresh the page.</span>';
+        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Popup was blocked. Please allow popups for this site and try again.</span>';
         return;
       }
 
-      if (!_markerImageEl) {
-        btn.disabled = false;
-        btn.textContent = '⚡ Compile & Activate AR';
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Marker image not ready. Please wait a second and try again.</span>';
-        return;
-      }
+      btn.disabled = true;
+      btn.textContent = '⏳ Compiling in new tab…';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = '<span style="color:var(--cream-dim)">🔄 Compiling in new tab — keep it in the foreground until it finishes.</span>';
 
-      btn.textContent = '⏳ Warming up…';
-      progressWrap.style.display = 'block';
-      progressBar.style.width = '0%';
-      progressLabel.textContent = 'Initialising TF backend (CPU)…';
-
-      // Wait for TF.js CPU backend to be ready before compiling
-      // Attempt to init TF backend with a 3 s timeout — never block compile
-      try {
-        const tf = window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE._tf;
-        if (tf) await Promise.race([tf.setBackend('webgl'), new Promise(r=>setTimeout(r,3000))]);
-      } catch(e) { /* continue regardless */ }
-
-      btn.textContent = '⏳ Compiling…';
-      progressLabel.textContent = 'Extracting marker features…';
-
-      try {
-        const compiler = new CompilerClass();
-
-        // FIX: Build the image input from the canvas directly.
-        // mindar-image-patched.js expects either an HTMLImageElement that is
-        // fully decoded OR a plain object {data, width, height} with raw RGBA
-        // pixels. Passing _markerImageEl (an <img>) works in the CDN build but
-        // hangs in the patched local build because it tries getImageData() on
-        // a cross-origin-tainted source. Reading pixels straight from the
-        // canvas avoids the taint entirely.
-        const markerCanvas = document.getElementById('marker-canvas');
-        const markerCtx = markerCanvas.getContext('2d');
-
-        // If a custom marker was uploaded, redraw it onto the canvas first
-        if (_markerImageEl && _markerImageEl.dataset.source === 'custom') {
-          markerCtx.clearRect(0, 0, 256, 256);
-          markerCtx.fillStyle = '#fff';
-          markerCtx.fillRect(0, 0, 256, 256);
-          const s = Math.min(256 / _markerImageEl.width, 256 / _markerImageEl.height);
-          const w = _markerImageEl.width * s, h = _markerImageEl.height * s;
-          markerCtx.drawImage(_markerImageEl, (256 - w) / 2, (256 - h) / 2, w, h);
+      // Listen for success message from compiler tab
+      function onCompilerMessage(e) {
+        if (e.data && e.data.type === 'DISHIFY_COMPILED') {
+          window.removeEventListener('message', onCompilerMessage);
+          btn.disabled = false;
+          btn.textContent = '✅ AR Active!';
+          btn.style.background = '#4caf7d';
+          resultEl.innerHTML = '<span style="color:#4caf7d">✅ AR marker compiled and saved! All restaurants are now live.</span>';
+          showGlobalARStatus();
+          showToast('✓ AR marker is now live!');
+          setTimeout(()=>{ btn.textContent='⚡ Recompile AR'; btn.style.background=''; }, 4000);
         }
-
-        // Pass the canvas element directly — compileImageTargets calls drawImage()
-        // internally, which only works with HTMLImageElement / HTMLCanvasElement.
-        // Passing a plain {data,width,height} object causes drawImage to silently
-        // fail, leaving the compiler hanging at 0 % forever.
-        await compiler.compileImageTargets([markerCanvas], (progress) => {
-          const pct = Math.round(progress * 100);
-          progressBar.style.width = pct + '%';
-          progressLabel.textContent = 'Compiling… ' + pct + '%';
-        });
-
-        progressLabel.textContent = 'Exporting data…';
-        progressBar.style.width = '100%';
-
-        // exportData() returns an ArrayBuffer
-        const buffer = compiler.exportData();
-
-        progressLabel.textContent = 'Encoding…';
-        // Convert ArrayBuffer → base64 data URI
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for(let i=0;i<bytes.byteLength;i++) binary += String.fromCharCode(bytes[i]);
-        const base64 = btoa(binary);
-        const dataUrl = 'data:application/octet-stream;base64,' + base64;
-
-        progressLabel.textContent = 'Saving to Firebase…';
-
-        // Save directly to Firebase — no hosting required
-        await db.ref('config/globalMindTarget').set({
-          url: dataUrl,
-          compiledAt: Date.now(),
-          source: 'auto-compiled'
-        });
-
-        progressWrap.style.display = 'none';
-        btn.textContent = '✅ AR Active!';
-        btn.style.background = '#4caf7d';
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = '<span style="color:#4caf7d">✅ Compiled and saved successfully! AR is now live for all restaurants.<br><span style="color:var(--cream-dim);font-size:.72rem">The .mind data is stored in Firebase — no external hosting needed.</span></span>';
-        showGlobalARStatus();
-        showToast('✓ AR marker is now live!');
-
-        // Re-enable with updated label after 3s
-        setTimeout(()=>{ btn.disabled=false; btn.textContent='⚡ Recompile AR'; btn.style.background=''; }, 3000);
-
-      } catch(err) {
-        progressWrap.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = '⚡ Compile & Activate AR';
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = '<span style="color:#bf4040">⚠ Compilation failed: ' + (err.message||err) + '</span>';
-        console.error('MindAR compile error:', err);
       }
+      window.addEventListener('message', onCompilerMessage);
+
+      // Fallback: poll Firebase directly in case postMessage doesn't fire
+      // (e.g. user navigated in the compiler tab)
+      const pollInterval = setInterval(async () => {
+        try {
+          const snap = await db.ref('config/globalMindTarget/compiledAt').once('value');
+          const ts = snap.val();
+          if (ts && Date.now() - ts < 120000) { // compiled within last 2 min
+            clearInterval(pollInterval);
+            window.removeEventListener('message', onCompilerMessage);
+            if (btn.disabled) {
+              btn.disabled = false;
+              btn.textContent = '✅ AR Active!';
+              btn.style.background = '#4caf7d';
+              resultEl.innerHTML = '<span style="color:#4caf7d">✅ AR marker compiled and saved! All restaurants are now live.</span>';
+              showGlobalARStatus();
+              showToast('✓ AR marker is now live!');
+              setTimeout(()=>{ btn.textContent='⚡ Recompile AR'; btn.style.background=''; }, 4000);
+            }
+          }
+        } catch(e){}
+      }, 3000);
+
+      // Stop polling after 5 minutes regardless
+      setTimeout(()=>{
+        clearInterval(pollInterval);
+        window.removeEventListener('message', onCompilerMessage);
+        if (btn.disabled) {
+          btn.disabled = false;
+          btn.textContent = '⚡ Compile & Activate AR';
+          btn.style.background = '';
+        }
+      }, 300000);
     }
 
-    function downloadMarker(){
+        function downloadMarker(){
       const canvas = document.getElementById('marker-canvas');
       if(!canvas){ showToast('Marker not ready'); return; }
       const a = document.createElement('a');

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dishify — AR Compiler</title>
+  <!-- Original unpatched MindAR bundle — runs WebGL properly in a foreground tab -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <style>
+    :root{--gold:#c9a84c;--ink:#070604;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,.65);--green:#4caf7d;--red:#bf4040}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;background:var(--ink);color:var(--cream);font-family:'Segoe UI',system-ui,sans-serif}
+    body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 20px;gap:28px}
+
+    .logo{font-family:Georgia,serif;font-size:1.6rem;font-weight:300;color:var(--gold);letter-spacing:.25em}
+
+    .card{background:#0e0d0a;border:1px solid rgba(201,168,76,.3);border-radius:6px;padding:28px 32px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:18px}
+
+    .title{font-size:.72rem;letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
+
+    /* The WebGL canvas MUST be visible for TF.js to create a WebGL context */
+    #gl-canvas{display:block;width:100%;height:6px;border-radius:3px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15)}
+
+    .progress-wrap{display:none;flex-direction:column;gap:6px}
+    .progress-label{font-size:.72rem;color:var(--cream-dim);letter-spacing:.1em}
+    .progress-track{height:4px;background:rgba(201,168,76,.12);border-radius:2px;overflow:hidden}
+    .progress-bar{height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width .25s ease}
+
+    .status{font-size:.82rem;line-height:1.7;display:none}
+    .status.show{display:block}
+    .status.ok{color:var(--green)}
+    .status.err{color:var(--red)}
+    .status.warn{color:#e0a020}
+
+    .close-btn{display:none;padding:11px 22px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-size:.8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;align-self:flex-start;transition:opacity .15s}
+    .close-btn:hover{opacity:.85}
+    .close-btn.show{display:block}
+
+    /* Marker preview */
+    #marker-preview{width:120px;height:120px;border:2px solid rgba(201,168,76,.35);border-radius:4px;background:#fff;align-self:center}
+  </style>
+</head>
+<body>
+  <div class="logo">DISHIFY</div>
+
+  <div class="card">
+    <div class="title">🎯 AR Marker Compiler</div>
+
+    <!-- Marker drawn here -->
+    <canvas id="marker-preview" width="256" height="256"></canvas>
+
+    <!-- WebGL context anchor — must be visible in DOM -->
+    <canvas id="gl-canvas" width="4" height="4"></canvas>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-label" id="progress-label">Starting…</div>
+      <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+    </div>
+
+    <div class="status" id="status"></div>
+    <button class="close-btn" id="close-btn" onclick="window.close()">✓ Done — Close Tab</button>
+  </div>
+
+  <script>
+    // ── Firebase ──────────────────────────────────────────────────────────────
+    const firebaseConfig={
+      apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",
+      authDomain:"dishify-menu.firebaseapp.com",
+      databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",
+      projectId:"dishify-menu",
+      storageBucket:"dishify-menu.firebasestorage.app",
+      messagingSenderId:"182873179650",
+      appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ── UI helpers ────────────────────────────────────────────────────────────
+    const progressWrap = document.getElementById('progress-wrap');
+    const progressBar  = document.getElementById('progress-bar');
+    const progressLbl  = document.getElementById('progress-label');
+    const statusEl     = document.getElementById('status');
+    const closeBtn     = document.getElementById('close-btn');
+
+    function setProgress(pct, label) {
+      progressWrap.style.display = 'flex';
+      progressBar.style.width = pct + '%';
+      progressLbl.textContent = label;
+    }
+    function setStatus(msg, type='ok') {
+      statusEl.textContent = msg;
+      statusEl.className = 'status show ' + type;
+    }
+    function done(msg) {
+      setStatus(msg, 'ok');
+      closeBtn.classList.add('show');
+      // Notify opener (admin tab) that compilation succeeded
+      if (window.opener) {
+        try { window.opener.postMessage({ type:'DISHIFY_COMPILED' }, '*'); } catch(e){}
+      }
+    }
+    function fail(msg) {
+      setStatus('⚠ ' + msg, 'err');
+      closeBtn.classList.add('show');
+    }
+
+    // ── Draw the Dishify marker onto the preview canvas ───────────────────────
+    function drawMarker(canvas) {
+      const ctx = canvas.getContext('2d');
+      const s = 256;
+      const fr = (x,y,w,h,c='#000') => { ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,s,s);
+      ctx.strokeStyle='#000'; ctx.lineWidth=10; ctx.strokeRect(10,10,236,236);
+      // Corner finders
+      fr(20,20,45,45); fr(27,27,30,30,'#fff'); fr(34,34,17,17);
+      fr(191,20,45,45); fr(198,27,30,30,'#fff'); fr(205,34,17,17);
+      fr(20,191,45,45); fr(27,198,30,30,'#fff'); fr(34,205,17,17);
+      // Bullseye
+      ctx.beginPath(); ctx.arc(128,128,35,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+      ctx.beginPath(); ctx.arc(128,128,25,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+      ctx.beginPath(); ctx.arc(128,128,15,0,Math.PI*2); ctx.fillStyle='#000'; ctx.fill();
+      // Ticks
+      ctx.strokeStyle='#000'; ctx.lineWidth=5;
+      [[128,77,128,87],[128,169,128,179],[77,128,87,128],[169,128,179,128]]
+        .forEach(([x1,y1,x2,y2])=>{ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); });
+      // Inner grid dots
+      [[80,80],[98,80],[149,80],[167,80],[80,98],[167,98],
+       [80,149],[167,149],[80,167],[98,167],[149,167],[167,167]]
+        .forEach(([x,y])=>fr(x,y,9,9));
+    }
+
+    // ── Check if a custom marker image was passed via URL param ───────────────
+    // Admin passes the marker as a base64 data URL in sessionStorage key 'dishify_marker_src'
+    function getMarkerImage() {
+      return new Promise(resolve => {
+        // Check if opener sent a custom marker
+        const stored = sessionStorage.getItem('dishify_marker_src');
+        if (stored) {
+          sessionStorage.removeItem('dishify_marker_src');
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = stored;
+          return;
+        }
+        resolve(null);
+      });
+    }
+
+    // ── Main compile flow ─────────────────────────────────────────────────────
+    async function compile() {
+      const markerCanvas = document.getElementById('marker-preview');
+
+      // Draw default marker first
+      drawMarker(markerCanvas);
+
+      // Check for custom marker from admin page
+      setProgress(0, 'Loading marker…');
+      const customImg = await getMarkerImage();
+      if (customImg) {
+        const ctx = markerCanvas.getContext('2d');
+        ctx.clearRect(0,0,256,256);
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,256,256);
+        const sc = Math.min(256/customImg.width, 256/customImg.height);
+        const w = customImg.width*sc, h = customImg.height*sc;
+        ctx.drawImage(customImg, (256-w)/2, (256-h)/2, w, h);
+        setStatus('Using custom marker image', 'warn');
+      }
+
+      // Wait for MindAR compiler to be available
+      setProgress(2, 'Waiting for compiler…');
+      const CompilerClass = await new Promise(resolve => {
+        let tries = 0;
+        const check = () => {
+          if (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler) {
+            resolve(window.MINDAR.IMAGE.Compiler);
+          } else if (++tries > 60) {
+            resolve(null);
+          } else {
+            setTimeout(check, 200);
+          }
+        };
+        check();
+      });
+
+      if (!CompilerClass) { fail('MindAR failed to load. Check your connection and try again.'); return; }
+
+      setProgress(5, 'Compiler ready — starting…');
+
+      try {
+        const compiler = new CompilerClass();
+
+        // Pass the canvas directly — this is the key:
+        // compileImageTargets internally calls drawImage(src) on each image.
+        // Passing an HTMLCanvasElement works perfectly and avoids any
+        // cross-origin taint issues from <img> elements.
+        await compiler.compileImageTargets([markerCanvas], (progress) => {
+          const pct = Math.round(5 + progress * 0.9); // scale to 5–95%
+          setProgress(pct, 'Compiling… ' + Math.round(progress) + '%');
+        });
+
+        setProgress(96, 'Exporting…');
+        const buffer = compiler.exportData();
+
+        setProgress(98, 'Encoding…');
+        // Convert ArrayBuffer → base64 data URI
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        // Use chunked btoa to avoid stack overflow on large buffers
+        const CHUNK = 8192;
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+        }
+        const dataUrl = 'data:application/octet-stream;base64,' + btoa(binary);
+
+        setProgress(99, 'Saving to Firebase…');
+        await db.ref('config/globalMindTarget').set({
+          url: dataUrl,
+          compiledAt: Date.now(),
+          source: 'auto-compiled'
+        });
+
+        setProgress(100, 'Done!');
+        done('✅ AR marker compiled and saved! All restaurants are now live.\nYou can close this tab.');
+
+      } catch(err) {
+        console.error('Compile error:', err);
+        fail('Compilation failed: ' + (err.message || err));
+      }
+    }
+
+    // Start as soon as the page is ready
+    window.addEventListener('load', compile);
+  </script>
+</body>
+</html>
