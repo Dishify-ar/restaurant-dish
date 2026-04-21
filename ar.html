@@ -32,31 +32,19 @@
     #hud{position:fixed;inset:0;z-index:500;pointer-events:none;display:none}
     #hud.show{display:block}
 
-    /* Back */
     #back-btn{position:absolute;top:18px;left:18px;pointer-events:all;background:rgba(7,6,4,.82);border:1px solid rgba(201,168,76,.4);color:var(--gold);padding:10px 16px;border-radius:3px;font-size:.74rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(12px)}
 
-    /* Item pill */
     #item-pill{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:rgba(7,6,4,.84);border:1px solid rgba(201,168,76,.35);backdrop-filter:blur(14px);border-radius:40px;padding:9px 18px;display:flex;align-items:center;gap:9px;white-space:nowrap;max-width:calc(100vw - 150px);overflow:hidden}
     #item-emoji{font-size:1.2rem;flex-shrink:0}
     #item-label{font-size:.78rem;font-weight:500;color:var(--cream);overflow:hidden;text-overflow:ellipsis}
 
-    /* Scan hint card — shown until target found */
-    #scan-hint{
-      position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
-      background:rgba(7,6,4,.88);border:1px solid rgba(201,168,76,.3);
-      backdrop-filter:blur(16px);border-radius:16px;
-      padding:18px 22px;text-align:center;
-      max-width:calc(100vw - 48px);width:320px;
-      transition:opacity .4s ease;
-    }
+    #scan-hint{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(7,6,4,.88);border:1px solid rgba(201,168,76,.3);backdrop-filter:blur(16px);border-radius:16px;padding:18px 22px;text-align:center;max-width:calc(100vw - 48px);width:320px;transition:opacity .4s ease}
     #scan-hint.gone{opacity:0;pointer-events:none}
-    /* Miniature marker preview */
     .hint-marker{width:64px;height:64px;margin:0 auto 10px;border:2px solid var(--gold);border-radius:6px;padding:3px;opacity:.85}
     .hint-marker svg{display:block;width:100%;height:100%}
     .hint-text{font-size:.76rem;color:var(--cream-dim);line-height:1.6}
     .hint-text strong{color:var(--gold)}
 
-    /* Aiming corners — hidden once found */
     .corners{position:absolute;top:50%;left:50%;transform:translate(-50%,-52%);width:min(68vw,260px);aspect-ratio:1;pointer-events:none}
     .corners::before,.corners::after,.corners>span::before,.corners>span::after{content:'';position:absolute;width:24px;height:24px;border-color:var(--gold);border-style:solid;animation:pc 2s ease-in-out infinite}
     .corners::before{top:0;left:0;border-width:2px 0 0 2px}
@@ -66,7 +54,6 @@
     @keyframes pc{0%,100%{opacity:.4}50%{opacity:1}}
     #hud.found .corners{display:none}
 
-    /* Found badge */
     #found-badge{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(76,175,125,.14);border:1px solid rgba(76,175,125,.5);backdrop-filter:blur(14px);border-radius:40px;padding:10px 24px;font-size:.75rem;font-weight:600;color:var(--green);letter-spacing:.15em;text-transform:uppercase;opacity:0;transition:opacity .4s ease;pointer-events:none;white-space:nowrap}
     #found-badge.show{opacity:1}
 
@@ -93,7 +80,6 @@
     <div id="item-pill"><span id="item-emoji">🍽️</span><span id="item-label">Loading…</span></div>
     <div class="corners"><span></span></div>
     <div id="scan-hint">
-      <!-- Miniature of the Dishify marker so guest knows what to point at -->
       <div class="hint-marker">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
           <rect width="512" height="512" fill="#fff"/>
@@ -131,36 +117,75 @@
     const itemName=params.get('item')||'';
     const modelParam=params.get('model')||'';
 
+    // Track any blob URL we create so we can revoke it on unload
+    let _mindBlobUrl = null;
+
     function goBack(){
       if(document.referrer.includes('menu.html'))history.back();
       else window.location.href='menu.html?r='+encodeURIComponent(rid);
     }
     document.getElementById('err-back').href='menu.html?r='+encodeURIComponent(rid);
 
-    function msg(t){document.getElementById('ld-msg').textContent=t}
+    function msg(t){ document.getElementById('ld-msg').textContent=t; }
 
     function showError(txt){
-      // FIX 1: Dismiss loading screen before showing error
       const loadEl=document.getElementById('loading');
       loadEl.classList.add('out');
-      setTimeout(()=>{loadEl.style.display='none';},520);
+      setTimeout(()=>{ loadEl.style.display='none'; }, 520);
       document.getElementById('err-msg').textContent=txt;
       document.getElementById('error').classList.add('show');
     }
 
     function convertModelUrl(url){
-      if(!url)return'';
-      const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);if(m1)return`https://drive.google.com/uc?export=download&id=${m1[1]}`;
-      const m2=url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);if(m2)return`https://drive.google.com/uc?export=download&id=${m2[1]}`;
+      if(!url) return '';
+      const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if(m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`;
+      const m2=url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+      if(m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
       return url;
     }
 
+    /**
+     * KEY FIX: Convert a base64 data URL → Blob URL.
+     *
+     * The compiled .mind file is stored in Firebase as a
+     * "data:application/octet-stream;base64,..." string which can be
+     * several megabytes long. Injecting that giant string directly into
+     * the `imageTargetSrc` attribute of <a-scene> via innerHTML causes
+     * mobile browsers to silently truncate the attribute value, corrupting
+     * the target data so MindAR can never parse it — and arReady never fires.
+     *
+     * Converting to a Blob URL gives us a short "blob:https://..." string
+     * that references the data already in memory. It's safe on all mobile
+     * browsers and has no size limit.
+     */
+    function dataUrlToBlobUrl(dataUrl) {
+      try {
+        // Split "data:<mime>;base64,<data>"
+        const [header, b64] = dataUrl.split(',');
+        const mime = header.match(/:(.*?);/)[1];
+
+        // Decode base64 → binary in chunks to avoid stack overflow
+        const binStr = atob(b64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+
+        const blob = new Blob([bytes], { type: mime });
+        return URL.createObjectURL(blob);
+      } catch(e) {
+        console.error('[AR] dataUrlToBlobUrl failed:', e);
+        return null;
+      }
+    }
+
     async function init(){
-      if(!rid||!itemName){showError('Missing info. Please scan the table QR code again.');return;}
+      if(!rid||!itemName){
+        showError('Missing info. Please scan the table QR code again.');
+        return;
+      }
 
       msg('Loading menu…');
 
-      // Fetch restaurant + global AR config in parallel
       let restaurant=null, globalConfig=null;
       try{
         const [rSnap,cSnap]=await Promise.all([
@@ -169,27 +194,40 @@
         ]);
         restaurant=rSnap.val();
         globalConfig=cSnap.val();
-      }catch(e){
+      } catch(e){
         showError('Could not connect. Check your internet and try again.');
         return;
       }
 
-      if(!restaurant){showError('Restaurant not found.');return;}
+      if(!restaurant){ showError('Restaurant not found.'); return; }
 
-      // Find the menu item
       let item=null;
       if(restaurant.menu) item=Object.values(restaurant.menu).find(i=>i.name===itemName);
 
-      // Resolve model URL (URL param takes priority, then Firebase)
       let glbUrl=modelParam?convertModelUrl(decodeURIComponent(modelParam)):'';
-      if(!glbUrl&&item&&item.model)glbUrl=convertModelUrl(item.model);
-      if(!glbUrl){showError(`No 3D model is set for "${itemName}".\nAsk the restaurant admin to add a .glb model for this dish.`);return;}
+      if(!glbUrl&&item&&item.model) glbUrl=convertModelUrl(item.model);
+      if(!glbUrl){
+        showError(`No 3D model is set for "${itemName}".\nAsk the restaurant admin to add a .glb model for this dish.`);
+        return;
+      }
 
-      // ── Global .mind target (automatic — no per-restaurant setup) ──
-      const mindUrl=globalConfig&&globalConfig.url?globalConfig.url:null;
-      if(!mindUrl){
+      const rawMindUrl=globalConfig&&globalConfig.url?globalConfig.url:null;
+      if(!rawMindUrl){
         showError('The AR marker hasn\'t been set up yet.\n\nAsk the admin to go to Admin Panel → QR Codes → Compile & Save Global Marker.\nThis only needs to be done once.');
         return;
+      }
+
+      // ── Convert .mind data URL → Blob URL ────────────────────────────────
+      // This is the critical step for mobile. See comment on dataUrlToBlobUrl().
+      msg('Preparing AR target…');
+      let mindUrl = rawMindUrl;
+      if (rawMindUrl.startsWith('data:')) {
+        mindUrl = dataUrlToBlobUrl(rawMindUrl);
+        if (!mindUrl) {
+          showError('Failed to prepare AR data.\nPlease try again.');
+          return;
+        }
+        _mindBlobUrl = mindUrl; // remember so we can revoke later
       }
 
       // Update HUD
@@ -198,12 +236,8 @@
 
       msg('Starting camera…');
 
-      // Scale: use item.arScale if set, otherwise sensible default
       const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
 
-      // FIX 2: Removed deprecated missTolerance and warmupTolerance params (removed in MindAR v1.2.3+).
-      // FIX 3: Raised filterMinCF from 0.001 to 0.01 — the lower value caused jitter and tracking stalls.
-      // FIX 4: Added crossorigin="anonymous" to a-asset-item to allow loading external GLB URLs (e.g. Google Drive).
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           mindar-image="imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;"
@@ -216,7 +250,6 @@
           </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
           <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
-            <!-- 3D model, sits just above the marker surface, slow spin -->
             <a-gltf-model
               id="dish-gltf"
               src="#dish-model"
@@ -225,7 +258,6 @@
               scale="${arScale}"
               animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
             </a-gltf-model>
-            <!-- Gold glow ring anchored under the model -->
             <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
               position="0 0 0.002" rotation="-90 0 0" opacity="0.22"
               material="transparent: true; side: double">
@@ -235,37 +267,66 @@
 
       const scene=document.getElementById('ar-scene');
 
-      // FIX 5: Guard arReady/arError with a flag so only one fires and
-      //         both clear the loading screen correctly.
       let arStarted=false;
+
       function onArReady(){
-        if(arStarted)return; arStarted=true;
+        if(arStarted) return;
+        arStarted=true;
         document.getElementById('loading').classList.add('out');
         document.getElementById('hud').classList.add('show');
       }
+
       function onArError(){
-        if(arStarted)return; arStarted=true;
+        if(arStarted) return;
+        arStarted=true;
         showError('Camera could not start.\nPlease allow camera access and reload the page.');
       }
 
       scene.addEventListener('arReady', onArReady, {once:true});
       scene.addEventListener('arError', onArError, {once:true});
 
-      scene.addEventListener('loaded',()=>{
+      // ── Safety-net timeout ──────────────────────────────────────────────
+      // On some mobile browsers (especially iOS Safari) neither arReady nor
+      // arError fires if camera permission is denied silently or if the
+      // browser's getUserMedia is blocked. After 25 s we show a helpful error
+      // rather than leaving the user on an infinite spinner.
+      const arTimeout = setTimeout(()=>{
+        if(!arStarted){
+          arStarted=true;
+          showError(
+            'AR is taking too long to start.\n\n' +
+            'Please check:\n' +
+            '• Camera permission is allowed for this site\n' +
+            '• You are using Chrome (Android) or Safari (iOS)\n' +
+            '• The page is served over HTTPS\n\n' +
+            'Tap "← Back" and try again.'
+          );
+        }
+      }, 25000);
+
+      scene.addEventListener('arReady', ()=>clearTimeout(arTimeout), {once:true});
+      scene.addEventListener('arError', ()=>clearTimeout(arTimeout), {once:true});
+
+      scene.addEventListener('loaded', ()=>{
         const target=document.getElementById('ar-target');
-        if(!target)return;
-        target.addEventListener('targetFound',()=>{
+        if(!target) return;
+        target.addEventListener('targetFound', ()=>{
           document.getElementById('hud').classList.add('found');
           document.getElementById('scan-hint').classList.add('gone');
           document.getElementById('found-badge').classList.add('show');
         });
-        target.addEventListener('targetLost',()=>{
+        target.addEventListener('targetLost', ()=>{
           document.getElementById('hud').classList.remove('found');
           document.getElementById('scan-hint').classList.remove('gone');
           document.getElementById('found-badge').classList.remove('show');
         });
       });
     }
+
+    // Clean up blob URL when user navigates away
+    window.addEventListener('pagehide', ()=>{
+      if(_mindBlobUrl) URL.revokeObjectURL(_mindBlobUrl);
+    });
 
     init();
   </script>
