@@ -234,20 +234,45 @@
       document.getElementById('item-label').textContent=itemName;
       document.getElementById('item-emoji').textContent=item?.emoji||'🍽️';
 
+      msg('Requesting camera permission…');
+
+      // Explicitly request camera access BEFORE mounting the AR scene.
+      // On many mobile browsers (especially Android Chrome) MindAR's internal
+      // getUserMedia call can fail silently if the permission prompt hasn't
+      // been shown yet. Requesting it ourselves first ensures the user sees
+      // the prompt and the permission is granted before MindAR tries to use it.
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        // Immediately stop the tracks — MindAR will open its own stream.
+        stream.getTracks().forEach(t => t.stop());
+      } catch(e) {
+        showError(
+          'Camera permission was denied.\n\n' +
+          'Please allow camera access for this site in your browser settings and reload the page.'
+        );
+        return;
+      }
+
       msg('Starting camera…');
 
       const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
 
-      // Build the a-scene WITHOUT the imageTargetSrc in the HTML string.
-      // Setting a multi-megabyte blob/data URL via innerHTML attribute interpolation
-      // can be silently truncated by mobile browsers. We set it via setAttribute()
-      // AFTER the element is in the DOM — this path has no size limit.
-      document.getElementById('scene-container').innerHTML=`
-        <a-scene id="ar-scene"
-          color-space="sRGB"
-          renderer="colorManagement: true; physicallyCorrectLights: true;"
-          vr-mode-ui="enabled: false"
-          device-orientation-permission-ui="enabled: false">
+      // Build the a-scene element programmatically so we can set
+      // the mindar-image attribute BEFORE attaching it to the DOM.
+      // This is the safest approach on all mobile browsers: the blob URL
+      // is already short ("blob:https://...") so it's safe to set as an
+      // attribute, and MindAR reads the attribute at mount-time correctly.
+      const sceneEl = document.createElement('a-scene');
+      sceneEl.id = 'ar-scene';
+      sceneEl.setAttribute('color-space', 'sRGB');
+      sceneEl.setAttribute('renderer', 'colorManagement: true; physicallyCorrectLights: true;');
+      sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
+      sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
+      // Set mindar-image BEFORE inserting into DOM so the component initialises correctly
+      sceneEl.setAttribute('mindar-image',
+        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;`);
+
+      sceneEl.innerHTML = `
           <a-assets timeout="30000">
             <a-asset-item id="dish-model" src="${glbUrl}" crossorigin="anonymous"></a-asset-item>
           </a-assets>
@@ -265,13 +290,9 @@
               position="0 0 0.002" rotation="-90 0 0" opacity="0.22"
               material="transparent: true; side: double">
             </a-ring>
-          </a-entity>
-        </a-scene>`;
+          </a-entity>`;
 
-      // Now safely set the mindar-image attribute via JS (no size limit this way)
-      const sceneEl = document.getElementById('ar-scene');
-      sceneEl.setAttribute('mindar-image',
-        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;`);
+      document.getElementById('scene-container').appendChild(sceneEl);
 
       const scene=sceneEl;
 
