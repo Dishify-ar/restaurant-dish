@@ -238,9 +238,12 @@
 
       const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
 
+      // Build the a-scene WITHOUT the imageTargetSrc in the HTML string.
+      // Setting a multi-megabyte blob/data URL via innerHTML attribute interpolation
+      // can be silently truncated by mobile browsers. We set it via setAttribute()
+      // AFTER the element is in the DOM — this path has no size limit.
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
-          mindar-image="imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true;"
           vr-mode-ui="enabled: false"
@@ -265,7 +268,12 @@
           </a-entity>
         </a-scene>`;
 
-      const scene=document.getElementById('ar-scene');
+      // Now safely set the mindar-image attribute via JS (no size limit this way)
+      const sceneEl = document.getElementById('ar-scene');
+      sceneEl.setAttribute('mindar-image',
+        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;`);
+
+      const scene=sceneEl;
 
       let arStarted=false;
 
