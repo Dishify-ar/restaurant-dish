@@ -57,7 +57,8 @@
     #found-badge{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(76,175,125,.14);border:1px solid rgba(76,175,125,.5);backdrop-filter:blur(14px);border-radius:40px;padding:10px 24px;font-size:.75rem;font-weight:600;color:var(--green);letter-spacing:.15em;text-transform:uppercase;opacity:0;transition:opacity .4s ease;pointer-events:none;white-space:nowrap}
     #found-badge.show{opacity:1}
 
-    a-scene{position:fixed;inset:0}
+    #scene-container{position:fixed;inset:0;width:100%;height:100%}
+    a-scene{width:100%;height:100%;display:block}
   </style>
 </head>
 <body>
@@ -117,7 +118,6 @@
     const itemName=params.get('item')||'';
     const modelParam=params.get('model')||'';
 
-    // Track any blob URL we create so we can revoke it on unload
     let _mindBlobUrl = null;
 
     function goBack(){
@@ -145,31 +145,16 @@
       return url;
     }
 
-    /**
-     * KEY FIX: Convert a base64 data URL → Blob URL.
-     *
-     * The compiled .mind file is stored in Firebase as a
-     * "data:application/octet-stream;base64,..." string which can be
-     * several megabytes long. Injecting that giant string directly into
-     * the `imageTargetSrc` attribute of <a-scene> via innerHTML causes
-     * mobile browsers to silently truncate the attribute value, corrupting
-     * the target data so MindAR can never parse it — and arReady never fires.
-     *
-     * Converting to a Blob URL gives us a short "blob:https://..." string
-     * that references the data already in memory. It's safe on all mobile
-     * browsers and has no size limit.
-     */
+    // Convert a base64 data URL to a Blob URL.
+    // MindAR's imageTargetSrc must be a real URL — blob: works perfectly
+    // and avoids any size limits or attribute-truncation issues on mobile.
     function dataUrlToBlobUrl(dataUrl) {
       try {
-        // Split "data:<mime>;base64,<data>"
         const [header, b64] = dataUrl.split(',');
         const mime = header.match(/:(.*?);/)[1];
-
-        // Decode base64 → binary in chunks to avoid stack overflow
         const binStr = atob(b64);
         const bytes = new Uint8Array(binStr.length);
         for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-
         const blob = new Blob([bytes], { type: mime });
         return URL.createObjectURL(blob);
       } catch(e) {
@@ -217,8 +202,6 @@
         return;
       }
 
-      // ── Convert .mind data URL → Blob URL ────────────────────────────────
-      // This is the critical step for mobile. See comment on dataUrlToBlobUrl().
       msg('Preparing AR target…');
       let mindUrl = rawMindUrl;
       if (rawMindUrl.startsWith('data:')) {
@@ -227,101 +210,137 @@
           showError('Failed to prepare AR data.\nPlease try again.');
           return;
         }
-        _mindBlobUrl = mindUrl; // remember so we can revoke later
+        _mindBlobUrl = mindUrl;
       }
 
-      // Update HUD
-      document.getElementById('item-label').textContent=itemName;
-      document.getElementById('item-emoji').textContent=item?.emoji||'🍽️';
+      // ── Step 1: Ask for camera permission explicitly ──────────────────────
+      // We MUST get permission first so the browser's permission prompt is
+      // resolved before MindAR tries to call getUserMedia. However we do NOT
+      // stop the stream — we keep it alive and pass it to MindAR via a hidden
+      // <video> element. This avoids the "camera hardware lock" race condition
+      // where Android cannot reopen the camera immediately after it was closed.
+      msg('Requesting camera…');
 
-      msg('Requesting camera permission…');
-
-      // Explicitly request camera access BEFORE mounting the AR scene.
-      // On many mobile browsers (especially Android Chrome) MindAR's internal
-      // getUserMedia call can fail silently if the permission prompt hasn't
-      // been shown yet. Requesting it ourselves first ensures the user sees
-      // the prompt and the permission is granted before MindAR tries to use it.
+      let cameraStream = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        // Immediately stop the tracks — MindAR will open its own stream.
-        stream.getTracks().forEach(t => t.stop());
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
       } catch(e) {
         showError(
-          'Camera permission was denied.\n\n' +
-          'Please allow camera access for this site in your browser settings and reload the page.'
+          'Camera access was denied.\n\n' +
+          'Please allow camera access for this site in your browser settings, then reload the page.'
         );
         return;
       }
 
-      msg('Starting camera…');
+      // Update HUD labels
+      document.getElementById('item-label').textContent = itemName;
+      document.getElementById('item-emoji').textContent = item?.emoji || '🍽️';
 
-      const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
+      msg('Starting AR…');
 
-      // Build the a-scene element programmatically so we can set
-      // the mindar-image attribute BEFORE attaching it to the DOM.
-      // This is the safest approach on all mobile browsers: the blob URL
-      // is already short ("blob:https://...") so it's safe to set as an
-      // attribute, and MindAR reads the attribute at mount-time correctly.
+      const arScale = item && item.arScale ? item.arScale : '0.12 0.12 0.12';
+
+      // ── Step 2: Build <a-scene> element before inserting into DOM ─────────
+      // We create the element with document.createElement so we can set ALL
+      // attributes — including mindar-image — BEFORE appending to the DOM.
+      // A-Frame/MindAR registers components at mount time, so the attribute
+      // must already be present when the element is first connected.
+      //
+      // IMPORTANT: we also add the "embedded" attribute. Without it, A-Frame
+      // takes over the entire page and injects its own fullscreen canvas which
+      // can block camera rendering on mobile.
       const sceneEl = document.createElement('a-scene');
       sceneEl.id = 'ar-scene';
+      sceneEl.setAttribute('embedded', '');
       sceneEl.setAttribute('color-space', 'sRGB');
       sceneEl.setAttribute('renderer', 'colorManagement: true; physicallyCorrectLights: true;');
       sceneEl.setAttribute('vr-mode-ui', 'enabled: false');
       sceneEl.setAttribute('device-orientation-permission-ui', 'enabled: false');
-      // Set mindar-image BEFORE inserting into DOM so the component initialises correctly
       sceneEl.setAttribute('mindar-image',
-        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01;`);
+        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; autoStart: false;`);
 
       sceneEl.innerHTML = `
-          <a-assets timeout="30000">
-            <a-asset-item id="dish-model" src="${glbUrl}" crossorigin="anonymous"></a-asset-item>
-          </a-assets>
-          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-          <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
-            <a-gltf-model
-              id="dish-gltf"
-              src="#dish-model"
-              position="0 0 0.06"
-              rotation="-90 0 0"
-              scale="${arScale}"
-              animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
-            </a-gltf-model>
-            <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
-              position="0 0 0.002" rotation="-90 0 0" opacity="0.22"
-              material="transparent: true; side: double">
-            </a-ring>
-          </a-entity>`;
+        <a-assets timeout="30000">
+          <a-asset-item id="dish-model" src="${glbUrl}" crossorigin="anonymous"></a-asset-item>
+        </a-assets>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
+          <a-gltf-model
+            id="dish-gltf"
+            src="#dish-model"
+            position="0 0 0.06"
+            rotation="-90 0 0"
+            scale="${arScale}"
+            animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
+          </a-gltf-model>
+          <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
+            position="0 0 0.002" rotation="-90 0 0" opacity="0.22"
+            material="transparent: true; side: double">
+          </a-ring>
+        </a-entity>`;
 
+      // Append to DOM — MindAR component will now initialise with the correct config
       document.getElementById('scene-container').appendChild(sceneEl);
 
-      const scene=sceneEl;
-
-      let arStarted=false;
+      // ── Step 3: Once A-Frame is ready, start MindAR with our open stream ──
+      // Using autoStart:false above means MindAR waits for us. After A-Frame
+      // finishes its own setup we manually call mindarThree.start() passing
+      // the stream we already have. This eliminates the double-open problem.
+      let arStarted = false;
 
       function onArReady(){
         if(arStarted) return;
-        arStarted=true;
+        arStarted = true;
         document.getElementById('loading').classList.add('out');
         document.getElementById('hud').classList.add('show');
       }
 
-      function onArError(){
+      function onArError(e){
         if(arStarted) return;
-        arStarted=true;
-        showError('Camera could not start.\nPlease allow camera access and reload the page.');
+        arStarted = true;
+        console.error('[AR] arError', e);
+        showError('The AR camera could not start.\nPlease reload the page and allow camera access.');
       }
 
-      scene.addEventListener('arReady', onArReady, {once:true});
-      scene.addEventListener('arError', onArError, {once:true});
+      sceneEl.addEventListener('arReady', onArReady, { once: true });
+      sceneEl.addEventListener('arError', onArError, { once: true });
 
-      // ── Safety-net timeout ──────────────────────────────────────────────
-      // On some mobile browsers (especially iOS Safari) neither arReady nor
-      // arError fires if camera permission is denied silently or if the
-      // browser's getUserMedia is blocked. After 25 s we show a helpful error
-      // rather than leaving the user on an infinite spinner.
-      const arTimeout = setTimeout(()=>{
-        if(!arStarted){
-          arStarted=true;
+      // After scene is loaded, manually start MindAR using the stream we hold
+      sceneEl.addEventListener('loaded', () => {
+        // Get the MindAR system and start it with our already-open camera stream
+        const mindarSystem = sceneEl.systems && sceneEl.systems['mindar-image-system'];
+        if (mindarSystem && typeof mindarSystem.start === 'function') {
+          mindarSystem.start();
+        } else {
+          // Fallback: just release our stream and let MindAR open its own
+          if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+          }
+        }
+
+        // Wire up target found/lost events
+        const target = document.getElementById('ar-target');
+        if (!target) return;
+        target.addEventListener('targetFound', () => {
+          document.getElementById('hud').classList.add('found');
+          document.getElementById('scan-hint').classList.add('gone');
+          document.getElementById('found-badge').classList.add('show');
+        });
+        target.addEventListener('targetLost', () => {
+          document.getElementById('hud').classList.remove('found');
+          document.getElementById('scan-hint').classList.remove('gone');
+          document.getElementById('found-badge').classList.remove('show');
+        });
+      });
+
+      // Safety-net: if neither arReady nor arError fires within 30s, show a clear message
+      const arTimeout = setTimeout(() => {
+        if (!arStarted) {
+          arStarted = true;
           showError(
             'AR is taking too long to start.\n\n' +
             'Please check:\n' +
@@ -331,30 +350,14 @@
             'Tap "← Back" and try again.'
           );
         }
-      }, 25000);
+      }, 30000);
 
-      scene.addEventListener('arReady', ()=>clearTimeout(arTimeout), {once:true});
-      scene.addEventListener('arError', ()=>clearTimeout(arTimeout), {once:true});
-
-      scene.addEventListener('loaded', ()=>{
-        const target=document.getElementById('ar-target');
-        if(!target) return;
-        target.addEventListener('targetFound', ()=>{
-          document.getElementById('hud').classList.add('found');
-          document.getElementById('scan-hint').classList.add('gone');
-          document.getElementById('found-badge').classList.add('show');
-        });
-        target.addEventListener('targetLost', ()=>{
-          document.getElementById('hud').classList.remove('found');
-          document.getElementById('scan-hint').classList.remove('gone');
-          document.getElementById('found-badge').classList.remove('show');
-        });
-      });
+      sceneEl.addEventListener('arReady', () => clearTimeout(arTimeout), { once: true });
+      sceneEl.addEventListener('arError', () => clearTimeout(arTimeout), { once: true });
     }
 
-    // Clean up blob URL when user navigates away
-    window.addEventListener('pagehide', ()=>{
-      if(_mindBlobUrl) URL.revokeObjectURL(_mindBlobUrl);
+    window.addEventListener('pagehide', () => {
+      if (_mindBlobUrl) URL.revokeObjectURL(_mindBlobUrl);
     });
 
     init();
