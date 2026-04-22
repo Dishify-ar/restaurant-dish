@@ -305,24 +305,29 @@
       // Setting a multi-megabyte blob/data URL via innerHTML attribute interpolation
       // can be silently truncated by mobile browsers. We set it via setAttribute()
       // AFTER the element is in the DOM — this path has no size limit.
-      // Build scene. Leave src empty on a-gltf-model — we set it after arReady
-      // because MindAR reinitializes scene entities when it processes the
-      // mindar-image component, which would clobber any src set before that.
+      // Register the model blob URL as an A-Frame asset so it loads reliably
+      // before the scene entities reference it. This avoids the race condition
+      // where a-gltf-model tries to resolve src before the blob is ready.
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
+          <a-assets id="ar-assets" timeout="30000">
+            <a-asset-item id="dish-model-asset" src="${modelBlobUrl}"></a-asset-item>
+          </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
           <a-light type="ambient" color="#ffffff" intensity="1.2"></a-light>
           <a-light type="directional" color="#ffffff" intensity="1.5" position="1 2 1"></a-light>
           <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
             <a-gltf-model
               id="dish-gltf"
+              src="#dish-model-asset"
               position="0 0 0.06"
               rotation="-90 0 0"
               scale="${arScale}"
+              visible="true"
               animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
             </a-gltf-model>
             <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
@@ -345,13 +350,18 @@
         if(arStarted) return;
         arStarted=true;
 
-        // ── Set model src NOW — after MindAR has finished initializing ──────
-        // MindAR reinitializes the scene's entities when it boots, so any src
-        // set before arReady gets wiped. Setting it here guarantees it sticks.
+        // ── Confirm model src is set; re-apply if somehow wiped by MindAR init ──
         const modelEl = document.getElementById('dish-gltf');
         if(modelEl){
-          modelEl.setAttribute('src', modelBlobUrl);
-          modelEl.addEventListener('model-loaded', () => console.log('[AR] ✅ Model loaded'));
+          // If MindAR wiped the src attribute, restore it directly
+          if(!modelEl.getAttribute('src')){
+            modelEl.setAttribute('src', modelBlobUrl);
+          }
+          modelEl.setAttribute('visible', 'true');
+          modelEl.addEventListener('model-loaded', () => {
+            console.log('[AR] ✅ Model loaded');
+            modelEl.setAttribute('visible', 'true');
+          });
           modelEl.addEventListener('model-error', (e) => console.error('[AR] ❌ Model error:', e.detail));
         }
 
@@ -419,6 +429,12 @@
           document.getElementById('hud').classList.add('found');
           document.getElementById('scan-hint').classList.add('gone');
           document.getElementById('found-badge').classList.add('show');
+          // Explicitly make the model visible when the target is found.
+          // MindAR sets the parent entity visible=false when the target is lost
+          // and visible=true when found, but the child gltf-model can sometimes
+          // be stuck with visible=false if it loaded while the entity was hidden.
+          const m = document.getElementById('dish-gltf');
+          if(m) m.setAttribute('visible', 'true');
         });
         target.addEventListener('targetLost', ()=>{
           document.getElementById('hud').classList.remove('found');
