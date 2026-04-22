@@ -277,23 +277,23 @@
 
       msg('Loading 3D model…');
 
-      // ── Fetch GLB as a Blob URL ───────────────────────────────────────────
-      // Google Drive "uc?export=download" URLs redirect cross-origin, which
-      // causes CORS failures in mobile browsers when A-Frame's XHR tries to
-      // load them via <a-assets>. Fetching the binary ourselves with fetch()
-      // (which follows redirects transparently) and making a local blob: URL
-      // sidesteps every CORS/redirect issue — the model is already in memory.
+      // ── Resolve the final model URL ───────────────────────────────────────
+      // Cloudinary raw resources and Google Drive export links both have CORS
+      // issues when A-Frame's internal loader tries to fetch them on mobile.
+      // Strategy: try to fetch + blob-ify first. If CORS blocks us, fall back
+      // to the direct URL and let A-Frame try (works when the server allows it).
       let modelBlobUrl = glbUrl;
       try {
-        const resp = await fetch(glbUrl);
+        const resp = await fetch(glbUrl, { credentials: 'omit' });
         if (resp.ok) {
           const buf = await resp.arrayBuffer();
           modelBlobUrl = URL.createObjectURL(
             new Blob([buf], { type: 'model/gltf-binary' })
           );
+          console.log('[AR] GLB pre-fetched as blob URL');
         }
       } catch(e) {
-        console.warn('[AR] GLB prefetch failed, using direct URL:', e);
+        console.warn('[AR] GLB prefetch failed (CORS?), using direct URL:', e);
         modelBlobUrl = glbUrl;
       }
 
@@ -305,7 +305,9 @@
       // Setting a multi-megabyte blob/data URL via innerHTML attribute interpolation
       // can be silently truncated by mobile browsers. We set it via setAttribute()
       // AFTER the element is in the DOM — this path has no size limit.
-      // We skip <a-assets> and set the blob URL directly — bypasses all CORS issues
+      // Build scene. Leave src empty on a-gltf-model — we set it after arReady
+      // because MindAR reinitializes scene entities when it processes the
+      // mindar-image component, which would clobber any src set before that.
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           color-space="sRGB"
@@ -330,18 +332,10 @@
           </a-entity>
         </a-scene>`;
 
-      // Now safely set the mindar-image attribute via JS (no size limit this way)
+      // Set the large mindar-image attribute safely via JS
       const sceneEl = document.getElementById('ar-scene');
       sceneEl.setAttribute('mindar-image',
         `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; webcamFacingMode: environment;`);
-
-      // Set model src via JS — avoids innerHTML truncation for long blob: URLs
-      const modelEl = document.getElementById('dish-gltf');
-      modelEl.setAttribute('src', modelBlobUrl);
-
-      // Log model load success/failure to help diagnose issues
-      modelEl.addEventListener('model-loaded', () => console.log('[AR] Model loaded OK'));
-      modelEl.addEventListener('model-error', (e) => console.error('[AR] Model failed to load:', e.detail));
 
       const scene=sceneEl;
 
@@ -350,6 +344,17 @@
       function onArReady(){
         if(arStarted) return;
         arStarted=true;
+
+        // ── Set model src NOW — after MindAR has finished initializing ──────
+        // MindAR reinitializes the scene's entities when it boots, so any src
+        // set before arReady gets wiped. Setting it here guarantees it sticks.
+        const modelEl = document.getElementById('dish-gltf');
+        if(modelEl){
+          modelEl.setAttribute('src', modelBlobUrl);
+          modelEl.addEventListener('model-loaded', () => console.log('[AR] ✅ Model loaded'));
+          modelEl.addEventListener('model-error', (e) => console.error('[AR] ❌ Model error:', e.detail));
+        }
+
         document.getElementById('loading').classList.add('out');
         document.getElementById('hud').classList.add('show');
       }
