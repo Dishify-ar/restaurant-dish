@@ -59,6 +59,46 @@
     #found-badge.show{opacity:1}
 
     a-scene{position:fixed;inset:0}
+
+    /* ── MINDAR CAMERA FEED FIX ──────────────────────────────────────────────
+       MindAR injects a <video> (camera feed) and a <canvas> (AR overlay)
+       directly into <body>. Without explicit sizing they collapse to 0×0 or
+       get painted over by the black body background, producing a black frame.
+       These rules pin both elements to the full viewport behind the HUD.    */
+    body > video,
+    #ar-scene video,
+    .mindar-ui-overlay video,
+    video[autoplay] {
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important;
+      object-fit: cover !important;
+      z-index: 0 !important;
+      background: transparent !important;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+
+    /* MindAR's own overlay canvas (drawn on top of video, under A-Frame) */
+    body > canvas:not([id]),
+    .mindar-ui-overlay canvas {
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important;
+      z-index: 1 !important;
+      background: transparent !important;
+      pointer-events: none !important;
+    }
+
+    /* A-Frame's own WebGL canvas must also be transparent so video shows through */
+    a-scene canvas {
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important;
+      z-index: 2 !important;
+      background: transparent !important;
+    }
   </style>
 </head>
 <body>
@@ -246,7 +286,7 @@
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           color-space="sRGB"
-          renderer="colorManagement: true; physicallyCorrectLights: true;"
+          renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
           <a-assets timeout="30000">
@@ -293,6 +333,28 @@
 
       scene.addEventListener('arReady', onArReady, {once:true});
       scene.addEventListener('arError', onArError, {once:true});
+
+      // ── Runtime video visibility patch ──────────────────────────────────
+      // On some mobile browsers MindAR's injected <video> element has its
+      // style reset after mount, collapsing it to 0×0 and producing a black
+      // frame. We poll briefly after arReady to re-apply full-screen sizing.
+      scene.addEventListener('arReady', () => {
+        const enforceVideoVisible = () => {
+          document.querySelectorAll('video').forEach(v => {
+            v.style.cssText = [
+              'position:fixed','top:0','left:0',
+              'width:100vw','height:100vh',
+              'object-fit:cover','z-index:0',
+              'background:transparent','display:block',
+              'visibility:visible','opacity:1'
+            ].join('!important;') + '!important';
+          });
+        };
+        // Apply immediately and again after a short delay (catches late resets)
+        enforceVideoVisible();
+        setTimeout(enforceVideoVisible, 300);
+        setTimeout(enforceVideoVisible, 800);
+      }, {once:true});
 
       // ── Safety-net timeout ──────────────────────────────────────────────
       // On some mobile browsers (especially iOS Safari) neither arReady nor
