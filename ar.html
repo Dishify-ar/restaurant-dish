@@ -275,6 +275,28 @@
       document.getElementById('item-label').textContent=itemName;
       document.getElementById('item-emoji').textContent=item?.emoji||'🍽️';
 
+      msg('Loading 3D model…');
+
+      // ── Fetch GLB as a Blob URL ───────────────────────────────────────────
+      // Google Drive "uc?export=download" URLs redirect cross-origin, which
+      // causes CORS failures in mobile browsers when A-Frame's XHR tries to
+      // load them via <a-assets>. Fetching the binary ourselves with fetch()
+      // (which follows redirects transparently) and making a local blob: URL
+      // sidesteps every CORS/redirect issue — the model is already in memory.
+      let modelBlobUrl = glbUrl;
+      try {
+        const resp = await fetch(glbUrl);
+        if (resp.ok) {
+          const buf = await resp.arrayBuffer();
+          modelBlobUrl = URL.createObjectURL(
+            new Blob([buf], { type: 'model/gltf-binary' })
+          );
+        }
+      } catch(e) {
+        console.warn('[AR] GLB prefetch failed, using direct URL:', e);
+        modelBlobUrl = glbUrl;
+      }
+
       msg('Starting camera…');
 
       const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
@@ -283,20 +305,19 @@
       // Setting a multi-megabyte blob/data URL via innerHTML attribute interpolation
       // can be silently truncated by mobile browsers. We set it via setAttribute()
       // AFTER the element is in the DOM — this path has no size limit.
+      // We skip <a-assets> and set the blob URL directly — bypasses all CORS issues
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
-          <a-assets timeout="30000">
-            <a-asset-item id="dish-model" src="${glbUrl}" crossorigin="anonymous"></a-asset-item>
-          </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+          <a-light type="ambient" color="#ffffff" intensity="1.2"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="1.5" position="1 2 1"></a-light>
           <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
             <a-gltf-model
               id="dish-gltf"
-              src="#dish-model"
               position="0 0 0.06"
               rotation="-90 0 0"
               scale="${arScale}"
@@ -313,6 +334,14 @@
       const sceneEl = document.getElementById('ar-scene');
       sceneEl.setAttribute('mindar-image',
         `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; webcamFacingMode: environment;`);
+
+      // Set model src via JS — avoids innerHTML truncation for long blob: URLs
+      const modelEl = document.getElementById('dish-gltf');
+      modelEl.setAttribute('src', modelBlobUrl);
+
+      // Log model load success/failure to help diagnose issues
+      modelEl.addEventListener('model-loaded', () => console.log('[AR] Model loaded OK'));
+      modelEl.addEventListener('model-error', (e) => console.error('[AR] Model failed to load:', e.detail));
 
       const scene=sceneEl;
 
