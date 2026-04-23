@@ -301,33 +301,58 @@
 
       const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
 
-      // Build the a-scene WITHOUT the imageTargetSrc in the HTML string.
-      // Setting a multi-megabyte blob/data URL via innerHTML attribute interpolation
-      // can be silently truncated by mobile browsers. We set it via setAttribute()
-      // AFTER the element is in the DOM — this path has no size limit.
-      // Register the model blob URL as an A-Frame asset so it loads reliably
-      // before the scene entities reference it. This avoids the race condition
-      // where a-gltf-model tries to resolve src before the blob is ready.
+      // ── Register a custom A-Frame component that handles model loading ──────
+      // This component lives on the gltf element itself, so it reacts to the
+      // correct A-Frame lifecycle events no matter when MindAR reinitialises.
+      AFRAME.registerComponent('dish-loader', {
+        schema: { src: {type:'string'}, scale: {type:'string'} },
+        init: function () {
+          const el = this.el;
+          const applyModel = () => {
+            if (!el.getAttribute('src') || el.getAttribute('src') !== this.data.src) {
+              el.setAttribute('src', this.data.src);
+            }
+          };
+          // Apply now and after a short delay in case MindAR resets it
+          applyModel();
+          setTimeout(applyModel, 500);
+          setTimeout(applyModel, 1500);
+
+          el.addEventListener('model-loaded', () => {
+            console.log('[AR] ✅ model-loaded fired');
+            el.setAttribute('visible', 'true');
+          });
+          el.addEventListener('model-error', (e) => {
+            console.error('[AR] ❌ model-error:', e.detail);
+          });
+        }
+      });
+
+      // ── Build the scene ────────────────────────────────────────────────────
+      // The mindar-image attribute is set via JS *after* DOM insertion so that
+      // the large blob URL is never truncated by innerHTML serialisation.
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
-          <a-assets id="ar-assets" timeout="30000">
-            <a-asset-item id="dish-model-asset" src="${modelBlobUrl}"></a-asset-item>
+          <a-assets timeout="30000">
+            <a-asset-item id="dish-asset" src="${modelBlobUrl}" crossorigin="anonymous"></a-asset-item>
           </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-          <a-light type="ambient" color="#ffffff" intensity="1.2"></a-light>
-          <a-light type="directional" color="#ffffff" intensity="1.5" position="1 2 1"></a-light>
+          <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="2" position="1 2 1"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="1" position="-1 1 -1"></a-light>
           <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
             <a-gltf-model
               id="dish-gltf"
-              src="#dish-model-asset"
+              src="#dish-asset"
               position="0 0 0.06"
               rotation="-90 0 0"
               scale="${arScale}"
               visible="true"
+              dish-loader="src: #dish-asset; scale: ${arScale}"
               animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
             </a-gltf-model>
             <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
@@ -337,32 +362,22 @@
           </a-entity>
         </a-scene>`;
 
-      // Set the large mindar-image attribute safely via JS
       const sceneEl = document.getElementById('ar-scene');
       sceneEl.setAttribute('mindar-image',
         `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; webcamFacingMode: environment;`);
 
-      const scene=sceneEl;
-
-      let arStarted=false;
+      const scene = sceneEl;
+      let arStarted = false;
 
       function onArReady(){
         if(arStarted) return;
-        arStarted=true;
+        arStarted = true;
 
-        // ── Confirm model src is set; re-apply if somehow wiped by MindAR init ──
+        // Final insurance: set src directly on the element after MindAR boots
         const modelEl = document.getElementById('dish-gltf');
         if(modelEl){
-          // If MindAR wiped the src attribute, restore it directly
-          if(!modelEl.getAttribute('src')){
-            modelEl.setAttribute('src', modelBlobUrl);
-          }
+          modelEl.setAttribute('src', '#dish-asset');
           modelEl.setAttribute('visible', 'true');
-          modelEl.addEventListener('model-loaded', () => {
-            console.log('[AR] ✅ Model loaded');
-            modelEl.setAttribute('visible', 'true');
-          });
-          modelEl.addEventListener('model-error', (e) => console.error('[AR] ❌ Model error:', e.detail));
         }
 
         document.getElementById('loading').classList.add('out');
@@ -371,7 +386,7 @@
 
       function onArError(){
         if(arStarted) return;
-        arStarted=true;
+        arStarted = true;
         showError('Camera could not start.\nPlease allow camera access and reload the page.');
       }
 
@@ -379,9 +394,6 @@
       scene.addEventListener('arError', onArError, {once:true});
 
       // ── Runtime video visibility patch ──────────────────────────────────
-      // On some mobile browsers MindAR's injected <video> element has its
-      // style reset after mount, collapsing it to 0×0 and producing a black
-      // frame. We poll briefly after arReady to re-apply full-screen sizing.
       scene.addEventListener('arReady', () => {
         const enforceVideoVisible = () => {
           document.querySelectorAll('video').forEach(v => {
@@ -394,20 +406,15 @@
             ].join('!important;') + '!important';
           });
         };
-        // Apply immediately and again after a short delay (catches late resets)
         enforceVideoVisible();
         setTimeout(enforceVideoVisible, 300);
         setTimeout(enforceVideoVisible, 800);
       }, {once:true});
 
-      // ── Safety-net timeout ──────────────────────────────────────────────
-      // On some mobile browsers (especially iOS Safari) neither arReady nor
-      // arError fires if camera permission is denied silently or if the
-      // browser's getUserMedia is blocked. After 25 s we show a helpful error
-      // rather than leaving the user on an infinite spinner.
+      // ── Safety-net timeout ───────────────────────────────────────────────
       const arTimeout = setTimeout(()=>{
         if(!arStarted){
-          arStarted=true;
+          arStarted = true;
           showError(
             'AR is taking too long to start.\n\n' +
             'Please check:\n' +
@@ -422,17 +429,16 @@
       scene.addEventListener('arReady', ()=>clearTimeout(arTimeout), {once:true});
       scene.addEventListener('arError', ()=>clearTimeout(arTimeout), {once:true});
 
+      // ── targetFound / targetLost ─────────────────────────────────────────
       scene.addEventListener('loaded', ()=>{
-        const target=document.getElementById('ar-target');
+        const target = document.getElementById('ar-target');
         if(!target) return;
         target.addEventListener('targetFound', ()=>{
           document.getElementById('hud').classList.add('found');
           document.getElementById('scan-hint').classList.add('gone');
           document.getElementById('found-badge').classList.add('show');
-          // Explicitly make the model visible when the target is found.
-          // MindAR sets the parent entity visible=false when the target is lost
-          // and visible=true when found, but the child gltf-model can sometimes
-          // be stuck with visible=false if it loaded while the entity was hidden.
+          // Force model visible — MindAR sets parent visible=true on found,
+          // but child elements may still be hidden if they loaded while hidden.
           const m = document.getElementById('dish-gltf');
           if(m) m.setAttribute('visible', 'true');
         });
