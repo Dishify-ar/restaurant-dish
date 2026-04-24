@@ -427,178 +427,199 @@
       const globalConfig = window._globalConfig;
       let glbUrl = window._glbUrlResolved;
 
-      const rawMindUrl=globalConfig&&globalConfig.url?globalConfig.url:null;
+      const rawMindUrl = globalConfig&&globalConfig.url ? globalConfig.url : null;
       if(!rawMindUrl){
-        showError('The AR marker hasn\'t been set up yet.\n\nAsk the admin to go to Admin Panel → QR Codes → Compile & Save Global Marker.\nThis only needs to be done once.');
+        showError("The AR marker hasn\'t been set up yet.\n\nAsk the admin to go to Admin Panel → QR Codes → Compile & Save Global Marker.\nThis only needs to be done once.");
         return;
       }
 
-      // Convert .mind data URL → Blob URL
-      msg('Preparing AR target…');
+      msg("Preparing AR target…");
       let mindUrl = rawMindUrl;
-      if(rawMindUrl.startsWith('data:')){
+      if(rawMindUrl.startsWith("data:")){
         mindUrl = dataUrlToBlobUrl(rawMindUrl);
-        if(!mindUrl){ showError('Failed to prepare AR data.\nPlease try again.'); return; }
+        if(!mindUrl){ showError("Failed to prepare AR data.\nPlease try again."); return; }
         _mindBlobUrl = mindUrl;
       }
 
-      msg('Fetching 3D model…');
-
-      // ── Blob-ify GLB for A-Frame ───────────────────────────────────────────
-      // Critical fix: Cloudinary and other CDNs often block A-Frame's internal
-      // XHR loader on mobile due to CORS. We pre-fetch here (same-origin CORS
-      // rules apply to fetch too, but fl_attachment helps), convert to a blob
-      // URL so A-Frame only reads local memory — no CORS at all.
+      // Pre-fetch GLB → blob URL so A-Frame has zero CORS to deal with
+      msg("Fetching 3D model…");
       let modelBlobUrl = glbUrl;
       try{
-        const resp = await fetch(glbUrl, { mode:'cors', credentials:'omit' });
+        const resp = await fetch(glbUrl, { mode:"cors", credentials:"omit" });
         if(resp.ok){
           const buf = await resp.arrayBuffer();
-          modelBlobUrl = URL.createObjectURL(new Blob([buf],{type:'model/gltf-binary'}));
+          modelBlobUrl = URL.createObjectURL(new Blob([buf], {type:"model/gltf-binary"}));
           _modelBlobUrl = modelBlobUrl;
-          console.log('[AR] GLB pre-fetched as blob URL ✅');
+          console.log("[AR] ✅ GLB blob URL ready");
         } else {
-          console.warn('[AR] GLB fetch returned', resp.status, '— using direct URL');
+          console.warn("[AR] GLB fetch status", resp.status, "— using direct URL");
         }
       } catch(e){
-        console.warn('[AR] GLB fetch failed (CORS?):', e.message, '— using direct URL');
+        console.warn("[AR] GLB fetch failed:", e.message, "— using direct URL");
       }
 
-      msg('Starting camera…');
+      msg("Starting camera…");
 
-      const arScale = item&&item.arScale ? item.arScale : '0.12 0.12 0.12';
+      const arScaleVec = item&&item.arScale ? item.arScale : "0.12 0.12 0.12";
+      const scaleParts = arScaleVec.split(" ").map(Number);
+      const sx = scaleParts[0], sy = scaleParts[1], sz = scaleParts[2];
 
-      // Register dish-loader component (safe to call multiple times)
-      if(!AFRAME.components['dish-loader']){
-        AFRAME.registerComponent('dish-loader', {
-          schema: { src:{type:'string'} },
+      // ── dish-ar-model component ───────────────────────────────────────────
+      // THE KEY FIX: MindAR controls visibility at the THREE.js object3D level
+      // (object3D.visible = true/false), completely bypassing A-Frame's
+      // setAttribute("visible"). So setAttribute does nothing against MindAR.
+      // We hook directly into object3D via targetFound/targetLost events and
+      // traverse the entire mesh tree to force every node visible.
+      if(!AFRAME.components["dish-ar-model"]){
+        AFRAME.registerComponent("dish-ar-model", {
+          schema: { src:{type:"string"} },
           init: function(){
+            const self = this;
             const el = this.el;
-            const applyModel = () => {
-              if(el.getAttribute('src') !== this.data.src)
-                el.setAttribute('src', this.data.src);
-            };
-            applyModel();
-            setTimeout(applyModel, 600);
-            setTimeout(applyModel, 1800);
-            el.addEventListener('model-loaded', ()=>{
-              console.log('[AR] ✅ model-loaded');
-              el.setAttribute('visible','true');
-              // Also force parent entity visible
-              if(el.parentEl) el.parentEl.setAttribute('visible','true');
+            const parent = el.parentEl; // the mindar-image-target entity
+
+            // Load the model directly (no a-assets)
+            el.setAttribute("src", this.data.src);
+
+            // When the mesh loads, make it visible regardless of tracking state
+            el.addEventListener("model-loaded", function(){
+              console.log("[AR] model-loaded ✅ — applying rotation & visibility");
+              // Set tilt rotation at object3D level so dish faces camera
+              el.object3D.rotation.x = -Math.PI / 2;
+              self._forceVisible();
             });
-            el.addEventListener('model-error', e=>console.error('[AR] ❌ model-error:', e.detail));
+
+            el.addEventListener("model-error", function(e){
+              console.error("[AR] model-error ❌", e.detail || e);
+            });
+
+            // Hook MindAR target events
+            if(parent){
+              parent.addEventListener("targetFound", function(){
+                console.log("[AR] targetFound — forcing THREE.js visibility");
+                // Defer one tick: MindAR sets parent.object3D.visible=true
+                // first, then we traverse children. Without defer, MindAR
+                // hasn't finished its pass yet.
+                setTimeout(function(){ self._forceVisible(); }, 0);
+              });
+              // targetLost: MindAR hides parent — we leave it alone
+            }
+          },
+
+          _forceVisible: function(){
+            const el = this.el;
+            const parent = el.parentEl;
+
+            // Force the model element and all its THREE.js children visible
+            if(el.object3D){
+              el.object3D.visible = true;
+              el.object3D.traverse(function(node){ node.visible = true; });
+            }
+            // Force the parent entity (mindar-image-target) visible too
+            if(parent && parent.object3D){
+              parent.object3D.visible = true;
+            }
           }
         });
       }
 
-      // Build A-Frame scene
-      document.getElementById('scene-container').innerHTML=`
+      // ── dish-spin component ───────────────────────────────────────────────
+      // Spin via tick() instead of A-Frame animation component — immune to
+      // MindAR state resets and doesn't touch the rotation attribute.
+      if(!AFRAME.components["dish-spin"]){
+        AFRAME.registerComponent("dish-spin", {
+          schema: { speed:{type:"number", default:0.35} },
+          tick: function(t, dt){
+            if(this.el.object3D) this.el.object3D.rotation.y += 0.017453 * this.data.speed * (dt / 16.67);
+          }
+        });
+      }
+
+      // ── Build scene ───────────────────────────────────────────────────────
+      // No <a-assets>: model src goes directly on a-gltf-model, loaded by
+      // dish-ar-model component above.
+      document.getElementById("scene-container").innerHTML = `
         <a-scene id="ar-scene"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
           vr-mode-ui="enabled: false"
-          device-orientation-permission-ui="enabled: false">
-          <a-assets timeout="40000">
-            <a-asset-item id="dish-asset" src="${modelBlobUrl}" crossorigin="anonymous"></a-asset-item>
-          </a-assets>
+          device-orientation-permission-ui="enabled: false"
+          loading-screen="enabled: false">
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-          <a-light type="ambient" color="#ffffff" intensity="1.8"></a-light>
-          <a-light type="directional" color="#ffffff" intensity="2.2" position="1 2 1"></a-light>
-          <a-light type="directional" color="#ffffff" intensity="1.2" position="-1 1 -1"></a-light>
-          <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
+          <a-light type="ambient"     color="#ffffff" intensity="2.0"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="2.5" position="1 2 1"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="1.5" position="-1 1 -1"></a-light>
+          <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
             <a-gltf-model
               id="dish-gltf"
-              src="#dish-asset"
               position="0 0 0.06"
-              rotation="-90 0 0"
-              scale="${arScale}"
-              visible="true"
-              dish-loader="src: #dish-asset"
-              animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
+              scale="${sx} ${sy} ${sz}"
+              dish-ar-model="src: ${modelBlobUrl}"
+              dish-spin="speed: 0.35">
             </a-gltf-model>
             <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
-              position="0 0 0.002" rotation="-90 0 0" opacity="0.22"
+              position="0 0 0.001" rotation="-90 0 0" opacity="0.25"
               material="transparent: true; side: double">
             </a-ring>
           </a-entity>
         </a-scene>`;
 
-      const sceneEl = document.getElementById('ar-scene');
-      sceneEl.setAttribute('mindar-image',
-        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; webcamFacingMode: environment;`);
+      const sceneEl = document.getElementById("ar-scene");
+      sceneEl.setAttribute("mindar-image",
+        `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; webcamFacingMode: environment; uiLoading: no; uiScanning: no; uiError: no;`);
 
       let arStarted = false;
 
       function onArReady(){
         if(arStarted) return;
         arStarted = true;
-        // Final insurance
-        const modelEl = document.getElementById('dish-gltf');
-        if(modelEl){
-          modelEl.setAttribute('src','#dish-asset');
-          modelEl.setAttribute('visible','true');
+        document.getElementById("loading").classList.add("out");
+        document.getElementById("hud").classList.add("show");
+        document.getElementById("flashlight-btn").classList.remove("hidden");
+
+        // Camera feed visibility fix
+        const fix = function(){ document.querySelectorAll("video").forEach(function(v){
+          v.style.cssText = "position:fixed!important;top:0!important;left:0!important;" +
+            "width:100vw!important;height:100vh!important;object-fit:cover!important;" +
+            "z-index:0!important;background:transparent!important;display:block!important;" +
+            "visibility:visible!important;opacity:1!important";
+        });};
+        fix(); setTimeout(fix, 300); setTimeout(fix, 900);
+
+        // HUD events
+        const target = document.getElementById("ar-target");
+        if(target){
+          target.addEventListener("targetFound", function(){
+            document.getElementById("hud").classList.add("found");
+            document.getElementById("scan-hint").classList.add("gone");
+            document.getElementById("found-badge").classList.add("show");
+          });
+          target.addEventListener("targetLost", function(){
+            document.getElementById("hud").classList.remove("found");
+            document.getElementById("scan-hint").classList.remove("gone");
+            document.getElementById("found-badge").classList.remove("show");
+          });
         }
-        document.getElementById('loading').classList.add('out');
-        document.getElementById('hud').classList.add('show');
-        // Show flashlight button (torch only works on device camera)
-        document.getElementById('flashlight-btn').classList.remove('hidden');
       }
 
       function onArError(){
         if(arStarted) return;
         arStarted = true;
-        showError('Camera could not start.\nPlease allow camera access and reload the page.');
+        showError("Camera could not start.\nPlease allow camera access and reload the page.");
       }
 
-      sceneEl.addEventListener('arReady', onArReady, {once:true});
-      sceneEl.addEventListener('arError', onArError, {once:true});
+      sceneEl.addEventListener("arReady", onArReady, {once:true});
+      sceneEl.addEventListener("arError", onArError, {once:true});
 
-      // Runtime video visibility patch
-      sceneEl.addEventListener('arReady', ()=>{
-        const fix = ()=>{ document.querySelectorAll('video').forEach(v=>{
-          v.style.cssText=['position:fixed','top:0','left:0','width:100vw','height:100vh',
-            'object-fit:cover','z-index:0','background:transparent','display:block',
-            'visibility:visible','opacity:1'].join('!important;')+'!important';
-        });};
-        fix(); setTimeout(fix,300); setTimeout(fix,800);
-      },{once:true});
-
-      // Safety-net timeout
-      const arTimeout = setTimeout(()=>{
+      const arTimeout = setTimeout(function(){
         if(!arStarted){
           arStarted = true;
-          showError('AR is taking too long to start.\n\nPlease check:\n• Camera permission is allowed for this site\n• You are using Chrome (Android) or Safari (iOS)\n• The page is served over HTTPS\n\nTap "← Back" and try again.');
+          showError("AR is taking too long to start.\n\nPlease check:\n• Camera permission is allowed for this site\n• You are using Chrome (Android) or Safari (iOS)\n• The page is served over HTTPS\n\nTap \"← Back\" and try again.");
         }
       }, 28000);
-      sceneEl.addEventListener('arReady',()=>clearTimeout(arTimeout),{once:true});
-      sceneEl.addEventListener('arError',()=>clearTimeout(arTimeout),{once:true});
-
-      // targetFound / targetLost — force model visible every time target is found
-      sceneEl.addEventListener('loaded', ()=>{
-        const target = document.getElementById('ar-target');
-        if(!target) return;
-        target.addEventListener('targetFound', ()=>{
-          document.getElementById('hud').classList.add('found');
-          document.getElementById('scan-hint').classList.add('gone');
-          document.getElementById('found-badge').classList.add('show');
-          const m = document.getElementById('dish-gltf');
-          if(m){
-            m.setAttribute('visible','true');
-            // Re-apply src in case MindAR wiped it
-            m.setAttribute('src','#dish-asset');
-            // Also make sure entity parent is visible
-            if(m.parentEl) m.parentEl.setAttribute('visible','true');
-          }
-        });
-        target.addEventListener('targetLost', ()=>{
-          document.getElementById('hud').classList.remove('found');
-          document.getElementById('scan-hint').classList.remove('gone');
-          document.getElementById('found-badge').classList.remove('show');
-        });
-      });
+      sceneEl.addEventListener("arReady", function(){ clearTimeout(arTimeout); }, {once:true});
+      sceneEl.addEventListener("arError", function(){ clearTimeout(arTimeout); }, {once:true});
     }
-
     // Clean up on unload
     window.addEventListener('pagehide', ()=>{
       if(_mindBlobUrl) URL.revokeObjectURL(_mindBlobUrl);
