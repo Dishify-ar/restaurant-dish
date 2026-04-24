@@ -464,80 +464,82 @@
       const scaleParts = arScaleVec.split(" ").map(Number);
       const sx = scaleParts[0], sy = scaleParts[1], sz = scaleParts[2];
 
+      // ── Store model URL globally so components can access it directly ─────
+      // CRITICAL: Never pass a blob:// URL through an A-Frame component schema
+      // string attribute — innerHTML parsing mangles blob URLs. Store the URL
+      // in a JS variable and read it directly from component init() instead.
+      window._AR_MODEL_URL = modelBlobUrl;
+
       // ── dish-ar-model component ───────────────────────────────────────────
-      // THE KEY FIX: MindAR controls visibility at the THREE.js object3D level
-      // (object3D.visible = true/false), completely bypassing A-Frame's
-      // setAttribute("visible"). So setAttribute does nothing against MindAR.
-      // We hook directly into object3D via targetFound/targetLost events and
-      // traverse the entire mesh tree to force every node visible.
+      // MindAR controls visibility at the THREE.js object3D level, bypassing
+      // A-Frame setAttribute entirely. We fight back at the same level.
       if(!AFRAME.components["dish-ar-model"]){
         AFRAME.registerComponent("dish-ar-model", {
-          schema: { src:{type:"string"} },
           init: function(){
             const self = this;
             const el = this.el;
-            const parent = el.parentEl; // the mindar-image-target entity
+            const parent = el.parentEl;
 
-            // Load the model directly (no a-assets)
-            el.setAttribute("src", this.data.src);
+            // Read URL directly from JS — NOT from schema/attribute
+            const src = window._AR_MODEL_URL;
+            console.log("[AR] dish-ar-model init, src =", src ? src.slice(0,60)+"..." : "MISSING");
 
-            // When the mesh loads, make it visible regardless of tracking state
+            if(!src){ console.error("[AR] No model URL available!"); return; }
+
+            // Tell A-Frame's gltf-model component to load the file.
+            // a-gltf-model is a primitive; its underlying component is "gltf-model"
+            // and its schema expects { src: url } — so we pass the object form.
+            el.setAttribute("gltf-model", { src: src });
+
             el.addEventListener("model-loaded", function(){
-              console.log("[AR] model-loaded ✅ — applying rotation & visibility");
-              // Set tilt rotation at object3D level so dish faces camera
-              el.object3D.rotation.x = -Math.PI / 2;
+              console.log("[AR] model-loaded ✅");
+              el.object3D.rotation.x = -Math.PI / 2; // tilt so dish faces camera
               self._forceVisible();
+              // Re-check after a short delay in case MindAR resets it
+              setTimeout(function(){ self._forceVisible(); }, 100);
+              setTimeout(function(){ self._forceVisible(); }, 500);
             });
 
             el.addEventListener("model-error", function(e){
               console.error("[AR] model-error ❌", e.detail || e);
             });
 
-            // Hook MindAR target events
             if(parent){
               parent.addEventListener("targetFound", function(){
-                console.log("[AR] targetFound — forcing THREE.js visibility");
-                // Defer one tick: MindAR sets parent.object3D.visible=true
-                // first, then we traverse children. Without defer, MindAR
-                // hasn't finished its pass yet.
+                console.log("[AR] targetFound");
                 setTimeout(function(){ self._forceVisible(); }, 0);
+                setTimeout(function(){ self._forceVisible(); }, 100);
               });
-              // targetLost: MindAR hides parent — we leave it alone
             }
           },
 
           _forceVisible: function(){
             const el = this.el;
             const parent = el.parentEl;
-
-            // Force the model element and all its THREE.js children visible
             if(el.object3D){
               el.object3D.visible = true;
               el.object3D.traverse(function(node){ node.visible = true; });
             }
-            // Force the parent entity (mindar-image-target) visible too
             if(parent && parent.object3D){
               parent.object3D.visible = true;
+              parent.object3D.traverse(function(node){ node.visible = true; });
             }
           }
         });
       }
 
-      // ── dish-spin component ───────────────────────────────────────────────
-      // Spin via tick() instead of A-Frame animation component — immune to
-      // MindAR state resets and doesn't touch the rotation attribute.
+      // ── dish-spin: Y-axis spin via tick, immune to MindAR resets ─────────
       if(!AFRAME.components["dish-spin"]){
         AFRAME.registerComponent("dish-spin", {
-          schema: { speed:{type:"number", default:0.35} },
           tick: function(t, dt){
-            if(this.el.object3D) this.el.object3D.rotation.y += 0.017453 * this.data.speed * (dt / 16.67);
+            if(this.el.object3D) this.el.object3D.rotation.y += 0.017453 * 0.35 * (dt / 16.67);
           }
         });
       }
 
       // ── Build scene ───────────────────────────────────────────────────────
-      // No <a-assets>: model src goes directly on a-gltf-model, loaded by
-      // dish-ar-model component above.
+      // a-gltf-model has NO src here — dish-ar-model sets it via setAttribute
+      // after init so the blob URL never touches innerHTML parsing.
       document.getElementById("scene-container").innerHTML = `
         <a-scene id="ar-scene"
           color-space="sRGB"
@@ -554,8 +556,8 @@
               id="dish-gltf"
               position="0 0 0.06"
               scale="${sx} ${sy} ${sz}"
-              dish-ar-model="src: ${modelBlobUrl}"
-              dish-spin="speed: 0.35">
+              dish-ar-model
+              dish-spin>
             </a-gltf-model>
             <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
               position="0 0 0.001" rotation="-90 0 0" opacity="0.25"
@@ -586,13 +588,28 @@
         });};
         fix(); setTimeout(fix, 300); setTimeout(fix, 900);
 
-        // HUD events
+        // HUD events + second-chance forceVisible from scene level
         const target = document.getElementById("ar-target");
         if(target){
           target.addEventListener("targetFound", function(){
             document.getElementById("hud").classList.add("found");
             document.getElementById("scan-hint").classList.add("gone");
             document.getElementById("found-badge").classList.add("show");
+            // Second-chance visibility trigger (belt-and-suspenders)
+            var modelEl = document.getElementById("dish-gltf");
+            if(modelEl && modelEl.object3D){
+              var forceAll = function(){
+                modelEl.object3D.visible = true;
+                modelEl.object3D.traverse(function(n){ n.visible = true; });
+                if(target.object3D){
+                  target.object3D.visible = true;
+                  target.object3D.traverse(function(n){ n.visible = true; });
+                }
+              };
+              forceAll();
+              setTimeout(forceAll, 50);
+              setTimeout(forceAll, 200);
+            }
           });
           target.addEventListener("targetLost", function(){
             document.getElementById("hud").classList.remove("found");
