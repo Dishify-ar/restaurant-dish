@@ -12,6 +12,7 @@
     :root{--gold:#c9a84c;--ink:#070604;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,.65);--green:#4caf7d}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{background:var(--ink);color:var(--cream);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100dvh;width:100dvw}
+    body.preview-mode{overflow:auto;height:auto}
 
     /* ── LOADING ── */
     #loading{position:fixed;inset:0;z-index:9000;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .5s ease}
@@ -59,6 +60,36 @@
     #found-badge.show{opacity:1}
 
     a-scene{position:fixed;inset:0}
+
+    /* ── PREVIEW SCREEN ── */
+    #preview{position:fixed;inset:0;z-index:8500;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px}
+    #preview.hide{display:none}
+    .pv-header{width:100%;padding:18px 20px 10px;display:flex;align-items:center;gap:12px}
+    .pv-back{background:rgba(7,6,4,.82);border:1px solid rgba(201,168,76,.4);color:var(--gold);padding:9px 14px;border-radius:3px;font-size:.72rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(12px);flex-shrink:0}
+    .pv-title{font-family:Georgia,serif;font-size:1.1rem;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pv-model-wrap{width:100%;max-width:480px;aspect-ratio:1/1;background:#0d0b08;border:1px solid #2a2520;border-radius:8px;overflow:hidden;margin:10px 20px 0;position:relative;align-self:center}
+    .pv-model-wrap model-viewer{width:100%;height:100%;--progress-bar-color:var(--gold)}
+    .pv-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none}
+    .pv-loading.hide{display:none}
+    .pv-spin{width:36px;height:36px;border:2px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .9s linear infinite}
+    .pv-load-txt{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cream-dim)}
+    .pv-error{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center}
+    .pv-error.show{display:flex}
+    .pv-error-icon{font-size:2rem}
+    .pv-error-txt{font-size:.8rem;color:var(--cream-dim);line-height:1.6}
+    .pv-actions{width:100%;max-width:480px;padding:18px 20px 0;display:flex;flex-direction:column;gap:12px;align-self:center}
+    .pv-btn-ar{width:100%;padding:16px;background:var(--gold);color:var(--ink);border:none;border-radius:4px;font-size:.88rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .18s cubic-bezier(.4,0,.2,1)}
+    .pv-btn-ar:hover{background:#dbb85c;transform:translateY(-1px);box-shadow:0 6px 24px rgba(201,168,76,.3)}
+    .pv-btn-ar:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+    .pv-hint{font-size:.72rem;color:var(--cream-dim);text-align:center;line-height:1.6;padding:0 20px}
+    .pv-item-info{width:100%;max-width:480px;padding:16px 20px 0;align-self:center}
+    .pv-item-name{font-family:Georgia,serif;font-size:1.5rem;color:var(--cream);margin-bottom:6px}
+    .pv-item-sub{font-size:.8rem;color:var(--cream-dim)}
+
+    /* ── FLASHLIGHT BUTTON ── */
+    #flashlight-btn{position:absolute;bottom:18px;right:18px;pointer-events:all;background:rgba(7,6,4,.85);border:1px solid rgba(201,168,76,.35);color:var(--gold);width:46px;height:46px;border-radius:50%;font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(12px);transition:all .2s ease}
+    #flashlight-btn.on{background:rgba(201,168,76,.2);border-color:var(--gold);box-shadow:0 0 12px rgba(201,168,76,.4)}
+    #flashlight-btn.hidden{display:none}
 
     /* ── MINDAR CAMERA FEED FIX ──────────────────────────────────────────────
        MindAR injects a <video> (camera feed) and a <canvas> (AR overlay)
@@ -144,6 +175,32 @@
       <div class="hint-text">Point your camera at the<br><strong>Dishify marker on your table</strong><br>to see the dish appear in 3D</div>
     </div>
     <div id="found-badge">✦ Dish Detected</div>
+    <button id="flashlight-btn" class="hidden" title="Toggle flashlight" onclick="toggleFlashlight()">🔦</button>
+  </div>
+
+  <!-- ── PREVIEW SCREEN ── -->
+  <div id="preview" class="hide">
+    <div class="pv-header">
+      <button class="pv-back" onclick="goBack()">← Back</button>
+      <span class="pv-title" id="pv-title">Loading…</span>
+    </div>
+    <div class="pv-model-wrap" id="pv-model-wrap">
+      <div class="pv-loading" id="pv-loading">
+        <div class="pv-spin"></div>
+        <div class="pv-load-txt">Loading 3D model…</div>
+      </div>
+      <div class="pv-error" id="pv-error">
+        <div class="pv-error-icon">⚠️</div>
+        <div class="pv-error-txt" id="pv-error-txt">Model could not be loaded.</div>
+      </div>
+      <!-- model-viewer injected by JS -->
+    </div>
+    <div class="pv-actions">
+      <button class="pv-btn-ar" id="pv-ar-btn" disabled onclick="launchARCamera()">
+        📷 &nbsp;View in AR (Live Camera)
+      </button>
+      <div class="pv-hint">Point your camera at the Dishify table marker to see this dish appear in 3D</div>
+    </div>
   </div>
 
   <div id="scene-container"></div>
@@ -158,8 +215,12 @@
     const itemName=params.get('item')||'';
     const modelParam=params.get('model')||'';
 
-    // Track any blob URL we create so we can revoke it on unload
+    // Track any blob URLs we create so we can revoke them on unload
     let _mindBlobUrl = null;
+    let _modelBlobUrl = null;
+    let _flashTrack = null;   // MediaStreamTrack for torch
+    let _flashOn = false;
+    let _arLaunched = false;  // has user clicked "View in AR" yet?
 
     function goBack(){
       if(document.referrer.includes('menu.html'))history.back();
@@ -173,44 +234,36 @@
       const loadEl=document.getElementById('loading');
       loadEl.classList.add('out');
       setTimeout(()=>{ loadEl.style.display='none'; }, 520);
+      // Also hide preview
+      document.getElementById('preview').classList.add('hide');
       document.getElementById('err-msg').textContent=txt;
       document.getElementById('error').classList.add('show');
     }
 
+    // ── URL helpers ───────────────────────────────────────────────────────────
     function convertModelUrl(url){
       if(!url) return '';
+      // Google Drive share links
       const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
       if(m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`;
       const m2=url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
       if(m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
+      // Cloudinary raw URLs — add fl_attachment flag so browser treats it as
+      // a download with proper CORS headers, fixing the "stuck loading" issue.
+      // Works for both /raw/upload/ and /image/upload/ delivery types.
+      if(url.includes('cloudinary.com') && !url.includes('fl_attachment')){
+        url = url.replace('/upload/', '/upload/fl_attachment/');
+      }
       return url;
     }
 
-    /**
-     * KEY FIX: Convert a base64 data URL → Blob URL.
-     *
-     * The compiled .mind file is stored in Firebase as a
-     * "data:application/octet-stream;base64,..." string which can be
-     * several megabytes long. Injecting that giant string directly into
-     * the `imageTargetSrc` attribute of <a-scene> via innerHTML causes
-     * mobile browsers to silently truncate the attribute value, corrupting
-     * the target data so MindAR can never parse it — and arReady never fires.
-     *
-     * Converting to a Blob URL gives us a short "blob:https://..." string
-     * that references the data already in memory. It's safe on all mobile
-     * browsers and has no size limit.
-     */
     function dataUrlToBlobUrl(dataUrl) {
       try {
-        // Split "data:<mime>;base64,<data>"
         const [header, b64] = dataUrl.split(',');
         const mime = header.match(/:(.*?);/)[1];
-
-        // Decode base64 → binary in chunks to avoid stack overflow
         const binStr = atob(b64);
         const bytes = new Uint8Array(binStr.length);
         for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-
         const blob = new Blob([bytes], { type: mime });
         return URL.createObjectURL(blob);
       } catch(e) {
@@ -219,6 +272,113 @@
       }
     }
 
+    // ── Flashlight ────────────────────────────────────────────────────────────
+    async function toggleFlashlight(){
+      const btn = document.getElementById('flashlight-btn');
+      if(!_flashTrack){
+        try{
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video:{ facingMode:'environment', advanced:[{torch:true}] }
+          });
+          _flashTrack = stream.getVideoTracks()[0];
+        } catch(e){
+          console.warn('[AR] torch not supported:', e);
+          btn.title = 'Flashlight not supported on this device';
+          btn.style.opacity = '0.4';
+          return;
+        }
+      }
+      _flashOn = !_flashOn;
+      try{
+        await _flashTrack.applyConstraints({ advanced:[{torch:_flashOn}] });
+        btn.classList.toggle('on', _flashOn);
+        btn.textContent = _flashOn ? '💡' : '🔦';
+      } catch(e){
+        console.warn('[AR] applyConstraints torch failed:', e);
+      }
+    }
+
+    // ── Preview screen ────────────────────────────────────────────────────────
+    function showPreview(glbUrl, itemObj){
+      // Hide loading overlay
+      const loadEl = document.getElementById('loading');
+      loadEl.classList.add('out');
+      setTimeout(()=>{ loadEl.style.display='none'; }, 520);
+
+      // Fill in item info
+      const emoji = itemObj?.emoji || '🍽️';
+      document.getElementById('pv-title').textContent = emoji + ' ' + itemName;
+      document.getElementById('item-label').textContent = itemName;
+      document.getElementById('item-emoji').textContent = emoji;
+
+      // Build model-viewer in the preview wrap
+      const wrap = document.getElementById('pv-model-wrap');
+      const pvLoading = document.getElementById('pv-loading');
+      const pvError = document.getElementById('pv-error');
+      const arBtn = document.getElementById('pv-ar-btn');
+
+      // Inject model-viewer script if not already there
+      if(!document.querySelector('script[src*="model-viewer"]')){
+        const s = document.createElement('script');
+        s.type = 'module';
+        s.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js';
+        document.head.appendChild(s);
+      }
+
+      const mv = document.createElement('model-viewer');
+      mv.setAttribute('src', glbUrl);
+      mv.setAttribute('camera-controls', '');
+      mv.setAttribute('touch-action', 'pan-y');
+      mv.setAttribute('auto-rotate', '');
+      mv.setAttribute('auto-rotate-delay', '500');
+      mv.setAttribute('rotation-per-second', '20deg');
+      mv.setAttribute('shadow-intensity', '1.5');
+      mv.setAttribute('environment-image', 'https://modelviewer.dev/shared-assets/environments/moon_1k.hdr');
+      mv.setAttribute('exposure', '1.2');
+      mv.setAttribute('reveal', 'auto');
+      mv.setAttribute('loading', 'eager');
+      mv.style.cssText = 'width:100%;height:100%;--progress-bar-color:#c9a84c';
+
+      mv.addEventListener('load', ()=>{
+        pvLoading.classList.add('hide');
+        arBtn.disabled = false;
+        console.log('[Preview] model-viewer loaded ✅');
+      }, {once:true});
+
+      mv.addEventListener('error', (e)=>{
+        pvLoading.classList.add('hide');
+        pvError.classList.add('show');
+        document.getElementById('pv-error-txt').textContent =
+          'Could not load 3D model.\nCheck the model URL or re-upload from admin.';
+        console.error('[Preview] model-viewer error:', e);
+      }, {once:true});
+
+      wrap.appendChild(mv);
+      document.getElementById('preview').classList.remove('hide');
+      document.body.classList.add('preview-mode');
+    }
+
+    // ── Launch AR camera (called from "View in AR" button) ────────────────────
+    async function launchARCamera(){
+      if(_arLaunched) return;
+      _arLaunched = true;
+
+      const arBtn = document.getElementById('pv-ar-btn');
+      arBtn.disabled = true;
+      arBtn.textContent = '⏳  Starting camera…';
+
+      // Hide preview, restore scroll lock for AR
+      document.getElementById('preview').classList.add('hide');
+      document.body.classList.remove('preview-mode');
+      const loadEl = document.getElementById('loading');
+      loadEl.style.display = '';
+      loadEl.classList.remove('out');
+      msg('Starting camera…');
+
+      await startAR();
+    }
+
+    // ── Main data-fetch + preview init ────────────────────────────────────────
     async function init(){
       if(!rid||!itemName){
         showError('Missing info. Please scan the table QR code again.');
@@ -252,98 +412,100 @@
         return;
       }
 
+      // Store for use in startAR()
+      window._glbUrlResolved = glbUrl;
+      window._itemResolved = item;
+      window._globalConfig = globalConfig;
+
+      // Show preview first — AR camera starts only when user taps the button
+      showPreview(glbUrl, item);
+    }
+
+    // ── AR startup (runs after user taps "View in AR") ────────────────────────
+    async function startAR(){
+      const item = window._itemResolved;
+      const globalConfig = window._globalConfig;
+      let glbUrl = window._glbUrlResolved;
+
       const rawMindUrl=globalConfig&&globalConfig.url?globalConfig.url:null;
       if(!rawMindUrl){
         showError('The AR marker hasn\'t been set up yet.\n\nAsk the admin to go to Admin Panel → QR Codes → Compile & Save Global Marker.\nThis only needs to be done once.');
         return;
       }
 
-      // ── Convert .mind data URL → Blob URL ────────────────────────────────
-      // This is the critical step for mobile. See comment on dataUrlToBlobUrl().
+      // Convert .mind data URL → Blob URL
       msg('Preparing AR target…');
       let mindUrl = rawMindUrl;
-      if (rawMindUrl.startsWith('data:')) {
+      if(rawMindUrl.startsWith('data:')){
         mindUrl = dataUrlToBlobUrl(rawMindUrl);
-        if (!mindUrl) {
-          showError('Failed to prepare AR data.\nPlease try again.');
-          return;
-        }
-        _mindBlobUrl = mindUrl; // remember so we can revoke later
+        if(!mindUrl){ showError('Failed to prepare AR data.\nPlease try again.'); return; }
+        _mindBlobUrl = mindUrl;
       }
 
-      // Update HUD
-      document.getElementById('item-label').textContent=itemName;
-      document.getElementById('item-emoji').textContent=item?.emoji||'🍽️';
+      msg('Fetching 3D model…');
 
-      msg('Loading 3D model…');
-
-      // ── Resolve the final model URL ───────────────────────────────────────
-      // Cloudinary raw resources and Google Drive export links both have CORS
-      // issues when A-Frame's internal loader tries to fetch them on mobile.
-      // Strategy: try to fetch + blob-ify first. If CORS blocks us, fall back
-      // to the direct URL and let A-Frame try (works when the server allows it).
+      // ── Blob-ify GLB for A-Frame ───────────────────────────────────────────
+      // Critical fix: Cloudinary and other CDNs often block A-Frame's internal
+      // XHR loader on mobile due to CORS. We pre-fetch here (same-origin CORS
+      // rules apply to fetch too, but fl_attachment helps), convert to a blob
+      // URL so A-Frame only reads local memory — no CORS at all.
       let modelBlobUrl = glbUrl;
-      try {
-        const resp = await fetch(glbUrl, { credentials: 'omit' });
-        if (resp.ok) {
+      try{
+        const resp = await fetch(glbUrl, { mode:'cors', credentials:'omit' });
+        if(resp.ok){
           const buf = await resp.arrayBuffer();
-          modelBlobUrl = URL.createObjectURL(
-            new Blob([buf], { type: 'model/gltf-binary' })
-          );
-          console.log('[AR] GLB pre-fetched as blob URL');
+          modelBlobUrl = URL.createObjectURL(new Blob([buf],{type:'model/gltf-binary'}));
+          _modelBlobUrl = modelBlobUrl;
+          console.log('[AR] GLB pre-fetched as blob URL ✅');
+        } else {
+          console.warn('[AR] GLB fetch returned', resp.status, '— using direct URL');
         }
-      } catch(e) {
-        console.warn('[AR] GLB prefetch failed (CORS?), using direct URL:', e);
-        modelBlobUrl = glbUrl;
+      } catch(e){
+        console.warn('[AR] GLB fetch failed (CORS?):', e.message, '— using direct URL');
       }
 
       msg('Starting camera…');
 
-      const arScale=item&&item.arScale?item.arScale:'0.12 0.12 0.12';
+      const arScale = item&&item.arScale ? item.arScale : '0.12 0.12 0.12';
 
-      // ── Register a custom A-Frame component that handles model loading ──────
-      // This component lives on the gltf element itself, so it reacts to the
-      // correct A-Frame lifecycle events no matter when MindAR reinitialises.
-      AFRAME.registerComponent('dish-loader', {
-        schema: { src: {type:'string'}, scale: {type:'string'} },
-        init: function () {
-          const el = this.el;
-          const applyModel = () => {
-            if (!el.getAttribute('src') || el.getAttribute('src') !== this.data.src) {
-              el.setAttribute('src', this.data.src);
-            }
-          };
-          // Apply now and after a short delay in case MindAR resets it
-          applyModel();
-          setTimeout(applyModel, 500);
-          setTimeout(applyModel, 1500);
+      // Register dish-loader component (safe to call multiple times)
+      if(!AFRAME.components['dish-loader']){
+        AFRAME.registerComponent('dish-loader', {
+          schema: { src:{type:'string'} },
+          init: function(){
+            const el = this.el;
+            const applyModel = () => {
+              if(el.getAttribute('src') !== this.data.src)
+                el.setAttribute('src', this.data.src);
+            };
+            applyModel();
+            setTimeout(applyModel, 600);
+            setTimeout(applyModel, 1800);
+            el.addEventListener('model-loaded', ()=>{
+              console.log('[AR] ✅ model-loaded');
+              el.setAttribute('visible','true');
+              // Also force parent entity visible
+              if(el.parentEl) el.parentEl.setAttribute('visible','true');
+            });
+            el.addEventListener('model-error', e=>console.error('[AR] ❌ model-error:', e.detail));
+          }
+        });
+      }
 
-          el.addEventListener('model-loaded', () => {
-            console.log('[AR] ✅ model-loaded fired');
-            el.setAttribute('visible', 'true');
-          });
-          el.addEventListener('model-error', (e) => {
-            console.error('[AR] ❌ model-error:', e.detail);
-          });
-        }
-      });
-
-      // ── Build the scene ────────────────────────────────────────────────────
-      // The mindar-image attribute is set via JS *after* DOM insertion so that
-      // the large blob URL is never truncated by innerHTML serialisation.
+      // Build A-Frame scene
       document.getElementById('scene-container').innerHTML=`
         <a-scene id="ar-scene"
           color-space="sRGB"
           renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true;"
           vr-mode-ui="enabled: false"
           device-orientation-permission-ui="enabled: false">
-          <a-assets timeout="30000">
+          <a-assets timeout="40000">
             <a-asset-item id="dish-asset" src="${modelBlobUrl}" crossorigin="anonymous"></a-asset-item>
           </a-assets>
           <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-          <a-light type="ambient" color="#ffffff" intensity="1.5"></a-light>
-          <a-light type="directional" color="#ffffff" intensity="2" position="1 2 1"></a-light>
-          <a-light type="directional" color="#ffffff" intensity="1" position="-1 1 -1"></a-light>
+          <a-light type="ambient" color="#ffffff" intensity="1.8"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="2.2" position="1 2 1"></a-light>
+          <a-light type="directional" color="#ffffff" intensity="1.2" position="-1 1 -1"></a-light>
           <a-entity mindar-image-target="targetIndex: 0" id="ar-target">
             <a-gltf-model
               id="dish-gltf"
@@ -352,7 +514,7 @@
               rotation="-90 0 0"
               scale="${arScale}"
               visible="true"
-              dish-loader="src: #dish-asset; scale: ${arScale}"
+              dish-loader="src: #dish-asset"
               animation__spin="property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 9000; easing: linear">
             </a-gltf-model>
             <a-ring color="#c9a84c" radius-inner="0.08" radius-outer="0.14"
@@ -366,22 +528,21 @@
       sceneEl.setAttribute('mindar-image',
         `imageTargetSrc: ${mindUrl}; filterMinCF: 0.01; filterBeta: 0.01; webcamFacingMode: environment;`);
 
-      const scene = sceneEl;
       let arStarted = false;
 
       function onArReady(){
         if(arStarted) return;
         arStarted = true;
-
-        // Final insurance: set src directly on the element after MindAR boots
+        // Final insurance
         const modelEl = document.getElementById('dish-gltf');
         if(modelEl){
-          modelEl.setAttribute('src', '#dish-asset');
-          modelEl.setAttribute('visible', 'true');
+          modelEl.setAttribute('src','#dish-asset');
+          modelEl.setAttribute('visible','true');
         }
-
         document.getElementById('loading').classList.add('out');
         document.getElementById('hud').classList.add('show');
+        // Show flashlight button (torch only works on device camera)
+        document.getElementById('flashlight-btn').classList.remove('hidden');
       }
 
       function onArError(){
@@ -390,57 +551,45 @@
         showError('Camera could not start.\nPlease allow camera access and reload the page.');
       }
 
-      scene.addEventListener('arReady', onArReady, {once:true});
-      scene.addEventListener('arError', onArError, {once:true});
+      sceneEl.addEventListener('arReady', onArReady, {once:true});
+      sceneEl.addEventListener('arError', onArError, {once:true});
 
-      // ── Runtime video visibility patch ──────────────────────────────────
-      scene.addEventListener('arReady', () => {
-        const enforceVideoVisible = () => {
-          document.querySelectorAll('video').forEach(v => {
-            v.style.cssText = [
-              'position:fixed','top:0','left:0',
-              'width:100vw','height:100vh',
-              'object-fit:cover','z-index:0',
-              'background:transparent','display:block',
-              'visibility:visible','opacity:1'
-            ].join('!important;') + '!important';
-          });
-        };
-        enforceVideoVisible();
-        setTimeout(enforceVideoVisible, 300);
-        setTimeout(enforceVideoVisible, 800);
-      }, {once:true});
+      // Runtime video visibility patch
+      sceneEl.addEventListener('arReady', ()=>{
+        const fix = ()=>{ document.querySelectorAll('video').forEach(v=>{
+          v.style.cssText=['position:fixed','top:0','left:0','width:100vw','height:100vh',
+            'object-fit:cover','z-index:0','background:transparent','display:block',
+            'visibility:visible','opacity:1'].join('!important;')+'!important';
+        });};
+        fix(); setTimeout(fix,300); setTimeout(fix,800);
+      },{once:true});
 
-      // ── Safety-net timeout ───────────────────────────────────────────────
+      // Safety-net timeout
       const arTimeout = setTimeout(()=>{
         if(!arStarted){
           arStarted = true;
-          showError(
-            'AR is taking too long to start.\n\n' +
-            'Please check:\n' +
-            '• Camera permission is allowed for this site\n' +
-            '• You are using Chrome (Android) or Safari (iOS)\n' +
-            '• The page is served over HTTPS\n\n' +
-            'Tap "← Back" and try again.'
-          );
+          showError('AR is taking too long to start.\n\nPlease check:\n• Camera permission is allowed for this site\n• You are using Chrome (Android) or Safari (iOS)\n• The page is served over HTTPS\n\nTap "← Back" and try again.');
         }
-      }, 25000);
+      }, 28000);
+      sceneEl.addEventListener('arReady',()=>clearTimeout(arTimeout),{once:true});
+      sceneEl.addEventListener('arError',()=>clearTimeout(arTimeout),{once:true});
 
-      scene.addEventListener('arReady', ()=>clearTimeout(arTimeout), {once:true});
-      scene.addEventListener('arError', ()=>clearTimeout(arTimeout), {once:true});
-
-      // ── targetFound / targetLost ─────────────────────────────────────────
-      scene.addEventListener('loaded', ()=>{
+      // targetFound / targetLost — force model visible every time target is found
+      sceneEl.addEventListener('loaded', ()=>{
         const target = document.getElementById('ar-target');
         if(!target) return;
         target.addEventListener('targetFound', ()=>{
           document.getElementById('hud').classList.add('found');
           document.getElementById('scan-hint').classList.add('gone');
           document.getElementById('found-badge').classList.add('show');
-          // Force model visible — MindAR sets parent visible=true on found,
-          // but child elements may still be hidden if they loaded while hidden.
           const m = document.getElementById('dish-gltf');
-          if(m) m.setAttribute('visible', 'true');
+          if(m){
+            m.setAttribute('visible','true');
+            // Re-apply src in case MindAR wiped it
+            m.setAttribute('src','#dish-asset');
+            // Also make sure entity parent is visible
+            if(m.parentEl) m.parentEl.setAttribute('visible','true');
+          }
         });
         target.addEventListener('targetLost', ()=>{
           document.getElementById('hud').classList.remove('found');
@@ -450,9 +599,11 @@
       });
     }
 
-    // Clean up blob URL when user navigates away
+    // Clean up on unload
     window.addEventListener('pagehide', ()=>{
       if(_mindBlobUrl) URL.revokeObjectURL(_mindBlobUrl);
+      if(_modelBlobUrl) URL.revokeObjectURL(_modelBlobUrl);
+      if(_flashTrack){ try{ _flashTrack.stop(); }catch(e){} }
     });
 
     init();
