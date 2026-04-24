@@ -4,9 +4,8 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
   <title>AR View — Dishify</title>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <style>
@@ -92,23 +91,23 @@
     #flashlight-btn.on{background:rgba(201,168,76,.2);border-color:var(--gold);box-shadow:0 0 12px rgba(201,168,76,.4)}
     #flashlight-btn.hidden{display:none}
 
-    /* ── MindAR Three.js canvas & video ──────────────────────────────────── */
-    #ar-canvas {
-      position: fixed !important;
-      top: 0 !important; left: 0 !important;
+    /* ── MindAR / A-Frame video & canvas fix ─────────────────────────────── */
+    body > video, video[autoplay] {
+      position: fixed !important; top: 0 !important; left: 0 !important;
       width: 100vw !important; height: 100vh !important;
-      z-index: 0 !important;
+      object-fit: cover !important; z-index: 0 !important;
+      display: block !important; visibility: visible !important; opacity: 1 !important;
     }
-    body > video,
-    video[autoplay] {
-      position: fixed !important;
-      top: 0 !important; left: 0 !important;
+    body > canvas:not([id]), .mindar-ui-overlay canvas {
+      position: fixed !important; top: 0 !important; left: 0 !important;
       width: 100vw !important; height: 100vh !important;
-      object-fit: cover !important;
-      z-index: 0 !important;
-      display: block !important;
-      visibility: visible !important;
-      opacity: 1 !important;
+      z-index: 1 !important; background: transparent !important;
+      pointer-events: none !important;
+    }
+    a-scene canvas {
+      position: fixed !important; top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important;
+      z-index: 2 !important; background: transparent !important;
     }
   </style>
 </head>
@@ -183,7 +182,7 @@
     </div>
   </div>
 
-  <canvas id="ar-canvas"></canvas>
+  <div id="scene-container"></div>
 
   <script>
     const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
@@ -401,16 +400,16 @@
       showPreview(glbUrl, item);
     }
 
-    // ── AR startup — pure Three.js + MindAR (no A-Frame) ───────────────────
+    // ── AR startup — A-Frame 1.4 + MindAR 1.2.5 ─────────────────────────────
     async function startAR(){
       const item      = window._itemResolved;
       const globalCfg = window._globalConfig;
       let   glbUrl    = window._glbUrlResolved;
 
-      // 1. Resolve .mind URL
+      // 1. .mind blob URL
       const rawMind = globalCfg && globalCfg.url ? globalCfg.url : null;
       if(!rawMind){
-        showError("The AR marker hasn't been set up yet.\nAsk the admin to compile & save the global marker.");
+        showError("The AR marker hasn't been set up yet.\nAsk the admin to compile the global marker in the Admin Panel.");
         return;
       }
       msg("Preparing AR target...");
@@ -421,163 +420,213 @@
         _mindBlobUrl = mindUrl;
       }
 
-      // 2. Pre-fetch GLB -> blob URL (eliminates all CORS issues inside Three.js loader)
+      // 2. Pre-fetch GLB -> blob (eliminates CORS inside A-Frame loader)
       msg("Fetching 3D model...");
-      let modelUrl = glbUrl;
+      let modelBlobUrl = glbUrl;
       try{
         const r = await fetch(glbUrl, { mode:"cors", credentials:"omit" });
         if(r.ok){
           const buf = await r.arrayBuffer();
-          modelUrl = URL.createObjectURL(new Blob([buf], { type:"model/gltf-binary" }));
-          _modelBlobUrl = modelUrl;
-          console.log("[AR] GLB blob ready");
+          modelBlobUrl = URL.createObjectURL(new Blob([buf], {type:"model/gltf-binary"}));
+          _modelBlobUrl = modelBlobUrl;
+          console.log("[AR] GLB blob ready:", modelBlobUrl.slice(0,40));
         } else {
-          console.warn("[AR] fetch status", r.status, "using direct URL");
+          console.warn("[AR] fetch", r.status, "- using direct URL");
         }
       } catch(e){
-        console.warn("[AR] fetch failed:", e.message, "using direct URL");
+        console.warn("[AR] fetch failed:", e.message, "- using direct URL");
       }
 
-      msg("Starting camera...");
+      msg("Building scene...");
 
-      // 3. Three.js renderer on our canvas
-      const canvas = document.getElementById("ar-canvas");
-      const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias:true, alpha:true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.physicallyCorrectLights = true;
+      const arScaleStr = item && item.arScale ? item.arScale : "0.12 0.12 0.12";
 
-      // 4. MindAR Three.js controller
-      const mindarThree = new window.MINDAR.IMAGE.MindARThree({
-        container: document.body,
-        imageTargetSrc: mindUrl,
-        maxTrack: 1,
-        filterMinCF: 0.01,
-        filterBeta: 0.01,
-        missTolerance: 5,
-        warmupTolerance: 5,
-        uiLoading: "no",
-        uiScanning: "no",
-        uiError: "no"
-      });
+      // ── Build entire A-Frame scene via createElement (NEVER innerHTML for blob URLs) ──
 
-      const scene  = mindarThree.scene;
-      const camera = mindarThree.camera;
+      // <a-scene>
+      const sceneEl = document.createElement("a-scene");
+      sceneEl.setAttribute("mindar-image",
+        "imageTargetSrc: " + mindUrl +
+        "; filterMinCF: 0.001; filterBeta: 0.001" +
+        "; webcamFacingMode: environment" +
+        "; uiLoading: no; uiScanning: no; uiError: no");
+      sceneEl.setAttribute("color-space", "sRGB");
+      sceneEl.setAttribute("renderer", "colorManagement: true; physicallyCorrectLights: true; alpha: true;");
+      sceneEl.setAttribute("vr-mode-ui", "enabled: false");
+      sceneEl.setAttribute("device-orientation-permission-ui", "enabled: false");
+      sceneEl.setAttribute("loading-screen", "enabled: false");
+      sceneEl.setAttribute("embedded", "true");
+      sceneEl.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2";
 
-      // 5. Lighting
-      scene.add(new THREE.AmbientLight(0xffffff, 2.0));
-      var dl1 = new THREE.DirectionalLight(0xffffff, 2.5);
-      dl1.position.set(1, 2, 1);
-      scene.add(dl1);
-      var dl2 = new THREE.DirectionalLight(0xffffff, 1.5);
-      dl2.position.set(-1, 1, -1);
-      scene.add(dl2);
+      // <a-assets>
+      const assetsEl = document.createElement("a-assets");
+      assetsEl.setAttribute("timeout", "30000");
 
-      // 6. Anchor at target index 0
-      const anchor = mindarThree.addAnchor(0);
+      // <a-asset-item> — src set via JS property, not attribute, to handle blob URLs safely
+      const assetItem = document.createElement("a-asset-item");
+      assetItem.setAttribute("id", "dish-model");
+      assetItem.setAttribute("src", modelBlobUrl);  // safe: direct property on created element
+      assetsEl.appendChild(assetItem);
+      sceneEl.appendChild(assetsEl);
 
-      // 7. Gold ring
-      var ringGeo = new THREE.RingGeometry(0.08, 0.14, 48);
-      var ringMat = new THREE.MeshBasicMaterial({ color:0xc9a84c, side:THREE.DoubleSide, transparent:true, opacity:0.3 });
-      var ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.001;
-      anchor.group.add(ring);
+      // <a-camera>
+      const camEl = document.createElement("a-camera");
+      camEl.setAttribute("position", "0 0 0");
+      camEl.setAttribute("look-controls", "enabled: false");
+      sceneEl.appendChild(camEl);
 
-      // 8. Model group — added to anchor immediately, filled after GLB loads
-      var modelGroup = new THREE.Group();
-      var arScaleVec = item && item.arScale ? item.arScale : "0.12 0.12 0.12";
-      var sp = arScaleVec.split(" ").map(Number);
-      var scaleFactor = (sp[0] && !isNaN(sp[0])) ? sp[0] : 0.12;
-      modelGroup.scale.setScalar(scaleFactor);
-      modelGroup.rotation.x = -Math.PI / 2;
-      anchor.group.add(modelGroup);
+      // lights
+      const amb = document.createElement("a-light");
+      amb.setAttribute("type", "ambient");
+      amb.setAttribute("color", "#ffffff");
+      amb.setAttribute("intensity", "2");
+      sceneEl.appendChild(amb);
 
-      // 9. Load GLB
-      var loader = new THREE.GLTFLoader();
-      loader.load(
-        modelUrl,
-        function(gltf){
-          console.log("[AR] GLTF loaded successfully");
-          gltf.scene.traverse(function(node){
-            if(node.isMesh && node.material){
-              node.material.needsUpdate = true;
-              if(node.material.map) node.material.map.colorSpace = THREE.SRGBColorSpace;
-            }
+      const dir1 = document.createElement("a-light");
+      dir1.setAttribute("type", "directional");
+      dir1.setAttribute("color", "#ffffff");
+      dir1.setAttribute("intensity", "2.5");
+      dir1.setAttribute("position", "1 2 1");
+      sceneEl.appendChild(dir1);
+
+      const dir2 = document.createElement("a-light");
+      dir2.setAttribute("type", "directional");
+      dir2.setAttribute("color", "#ffffff");
+      dir2.setAttribute("intensity", "1.5");
+      dir2.setAttribute("position", "-1 1 -1");
+      sceneEl.appendChild(dir2);
+
+      // <a-entity mindar-image-target> — the anchor
+      const targetEl = document.createElement("a-entity");
+      targetEl.setAttribute("id", "ar-target");
+      targetEl.setAttribute("mindar-image-target", "targetIndex: 0");
+
+      // <a-gltf-model> inside the target
+      const modelEl = document.createElement("a-gltf-model");
+      modelEl.setAttribute("id", "dish-gltf");
+      modelEl.setAttribute("src", "#dish-model");   // reference by asset ID
+      modelEl.setAttribute("position", "0 0 0.06");
+      modelEl.setAttribute("rotation", "-90 0 0");
+      modelEl.setAttribute("scale", arScaleStr);
+      modelEl.setAttribute("visible", "true");
+
+      // Gold ring
+      const ringEl = document.createElement("a-ring");
+      ringEl.setAttribute("color", "#c9a84c");
+      ringEl.setAttribute("radius-inner", "0.08");
+      ringEl.setAttribute("radius-outer", "0.14");
+      ringEl.setAttribute("position", "0 0 0.001");
+      ringEl.setAttribute("rotation", "-90 0 0");
+      ringEl.setAttribute("opacity", "0.3");
+      ringEl.setAttribute("material", "transparent: true; side: double");
+
+      targetEl.appendChild(modelEl);
+      targetEl.appendChild(ringEl);
+      sceneEl.appendChild(targetEl);
+
+      // Insert scene into container
+      const container = document.getElementById("scene-container");
+      container.innerHTML = "";
+      container.appendChild(sceneEl);
+
+      // ── Wait for model to load, then start AR ────────────────────────────
+      // A-Frame's asset system fires "loaded" on <a-assets> when all items
+      // are ready. We MUST wait for this before MindAR starts, otherwise the
+      // model entity has no geometry and renders nothing.
+
+      let arStarted = false;
+
+      function doStartAR(){
+        if(arStarted) return;
+        arStarted = true;
+
+        console.log("[AR] Assets loaded, starting AR...");
+        msg("Starting camera...");
+
+        // model-loaded fires on the gltf element when geometry is parsed
+        modelEl.addEventListener("model-loaded", function(){
+          console.log("[AR] model-loaded event fired ✅");
+        });
+        modelEl.addEventListener("model-error", function(e){
+          console.error("[AR] model-error ❌", e.detail);
+        });
+
+        sceneEl.addEventListener("arReady", function(){
+          console.log("[AR] arReady ✅");
+          document.getElementById("loading").classList.add("out");
+          document.getElementById("hud").classList.add("show");
+          document.getElementById("flashlight-btn").classList.remove("hidden");
+          document.getElementById("item-label").textContent  = item ? item.name  : "";
+          document.getElementById("item-emoji").textContent  = item && item.emoji ? item.emoji : "🍽️";
+
+          // Video visibility fix
+          setTimeout(function fixVideo(){
+            document.querySelectorAll("video").forEach(function(v){
+              v.style.cssText = "position:fixed!important;top:0!important;left:0!important;" +
+                "width:100vw!important;height:100vh!important;object-fit:cover!important;" +
+                "z-index:0!important;display:block!important;visibility:visible!important;opacity:1!important";
+            });
+          }, 200);
+
+          // Target events
+          targetEl.addEventListener("targetFound", function(){
+            console.log("[AR] targetFound");
+            document.getElementById("hud").classList.add("found");
+            document.getElementById("scan-hint").classList.add("gone");
+            document.getElementById("found-badge").classList.add("show");
+
+            // Force visible at THREE.js level - this is what actually matters
+            setTimeout(function(){
+              if(modelEl.object3D){
+                modelEl.object3D.visible = true;
+                modelEl.object3D.traverse(function(n){ n.visible = true; });
+              }
+              if(targetEl.object3D){
+                targetEl.object3D.visible = true;
+              }
+              console.log("[AR] forced object3D visible");
+            }, 0);
           });
-          modelGroup.add(gltf.scene);
-          console.log("[AR] Model added to scene. Children:", modelGroup.children.length);
-        },
-        function(xhr){
-          if(xhr.total) console.log("[AR] loading " + Math.round(xhr.loaded/xhr.total*100) + "%");
-        },
-        function(err){
-          console.error("[AR] GLTFLoader error:", err);
-          showError("Could not load 3D model.\nPlease try again.");
-        }
-      );
 
-      // 10. Resize
-      function onResize(){
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        if(camera.isPerspectiveCamera){
-          camera.aspect = window.innerWidth / window.innerHeight;
-          camera.updateProjectionMatrix();
-        }
-      }
-      window.addEventListener("resize", onResize);
+          targetEl.addEventListener("targetLost", function(){
+            document.getElementById("hud").classList.remove("found");
+            document.getElementById("scan-hint").classList.remove("gone");
+            document.getElementById("found-badge").classList.remove("show");
+          });
+        }, {once: true});
 
-      // 11. Start MindAR (starts camera)
-      try{
-        await mindarThree.start();
-      } catch(e){
-        console.error("[AR] MindAR start error:", e);
-        showError("Camera could not start.\nPlease allow camera access and reload.");
-        return;
+        sceneEl.addEventListener("arError", function(){
+          document.getElementById("loading").classList.add("out");
+          showError("Camera could not start.\nPlease allow camera access and reload.");
+        }, {once: true});
+
+        // Safety timeout
+        setTimeout(function(){
+          if(!document.getElementById("hud").classList.contains("show")){
+            showError("AR is taking too long.\n\nPlease check:\n- Camera permission allowed\n- Using Chrome (Android) or Safari (iOS)\n- Page served over HTTPS");
+          }
+        }, 25000);
       }
 
-      // Show HUD
-      document.getElementById("loading").classList.add("out");
-      document.getElementById("hud").classList.add("show");
-      document.getElementById("flashlight-btn").classList.remove("hidden");
-      document.getElementById("item-label").textContent  = item ? item.name  : "";
-      document.getElementById("item-emoji").textContent  = item && item.emoji ? item.emoji : "🍽️";
+      // Wait for <a-assets> loaded event, with fallback timeout
+      assetsEl.addEventListener("loaded", function(){
+        console.log("[AR] a-assets loaded ✅");
+        doStartAR();
+      }, {once: true});
 
-      // 12. Target events
-      anchor.onTargetFound = function(){
-        console.log("[AR] target found — model children:", modelGroup.children.length);
-        document.getElementById("hud").classList.add("found");
-        document.getElementById("scan-hint").classList.add("gone");
-        document.getElementById("found-badge").classList.add("show");
-      };
-      anchor.onTargetLost = function(){
-        document.getElementById("hud").classList.remove("found");
-        document.getElementById("scan-hint").classList.remove("gone");
-        document.getElementById("found-badge").classList.remove("show");
-      };
-
-      // 13. Render loop
-      var spinAngle = 0;
-      renderer.setAnimationLoop(function(){
-        spinAngle += 0.006;
-        modelGroup.rotation.z = spinAngle;
-        mindarThree.updateRenderState(renderer, scene, camera);
-        renderer.render(scene, camera);
-      });
-
-      window._mindarThree = mindarThree;
-      window._arRenderer  = renderer;
-      window._arResize    = onResize;
+      // Fallback: if assets take too long or already loaded, start anyway
+      setTimeout(function(){
+        if(!arStarted){
+          console.warn("[AR] a-assets timeout - starting anyway");
+          doStartAR();
+        }
+      }, 8000);
     }
     // Clean up on unload
     window.addEventListener('pagehide', function(){
-      if(_mindBlobUrl) URL.revokeObjectURL(_mindBlobUrl);
+      if(_mindBlobUrl)  URL.revokeObjectURL(_mindBlobUrl);
       if(_modelBlobUrl) URL.revokeObjectURL(_modelBlobUrl);
       if(_flashTrack){ try{ _flashTrack.stop(); }catch(e){} }
-      if(window._mindarThree){ try{ window._mindarThree.stop(); }catch(e){} }
-      if(window._arRenderer){ try{ window._arRenderer.setAnimationLoop(null); }catch(e){} }
-      if(window._arResize) window.removeEventListener('resize', window._arResize);
     });
 
     init();
