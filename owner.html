@@ -389,6 +389,22 @@
       setTimeout(() => { win.print(); }, 600);
     }
 
+    // Safe wrapper: looks up order from in-memory allOrders map by _oid
+    function printReceiptByOid(oid) {
+      const o = allOrders[oid];
+      if (!o) { showToast('Order data not found'); return; }
+      printReceipt(
+        o.id || o._oid.slice(-6).toUpperCase(),
+        o.table || 'Walk-in',
+        o.orderType || 'dine-in',
+        o.items || [],
+        o.total || 0,
+        o.timestampStr || '',
+        o.specialRequests || '',
+        restName || ''
+      );
+    }
+
     // ── LOAD RESTAURANTS INTO PICKER ──
     db.ref('restaurants').once('value', snap => {
       allRestaurants = snap.val() || {};
@@ -559,7 +575,7 @@
               <div class="order-id">#${o.id||o._oid.slice(-6).toUpperCase()} <span style="margin-left:6px;font-size:.62rem;padding:2px 8px;border-radius:2px;background:${o.orderType==='takeaway'?'rgba(96,168,255,.12)':'rgba(76,175,125,.1)'};border:1px solid ${o.orderType==='takeaway'?'rgba(96,168,255,.3)':'rgba(76,175,125,.3)'};color:${o.orderType==='takeaway'?'#60a8ff':'#4caf7d'}">${o.orderType==='takeaway'?'🥡 Takeaway':'🍽️ Dine In'}</span></div>
               <div class="order-table">${o.table||'Walk-in'}</div>
             </div>
-            <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">${chip}<span style="font-size:.68rem;color:var(--cream-dim)">${o.timestampStr||''}</span><button onclick="printReceipt('${o.id||o._oid.slice(-6).toUpperCase()}','${(o.table||'Walk-in').replace(/'/g,"\\'")}','${o.orderType||'dine-in'}',${JSON.stringify(o.items||[]).replace(/'/g,"\\'")},'${o.total||0}','${(o.timestampStr||'').replace(/'/g,"\\'")}','${(o.specialRequests||'').replace(/'/g,"\\'")}','${(restName||'').replace(/'/g,"\\'")}' )" style="font-size:.62rem;padding:4px 10px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:2px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;font-family:'Outfit',sans-serif;transition:all .15s ease" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#3a3020';this.style.color='var(--cream-dim)'">🖨 Print</button></div>
+            <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px">${chip}<span style="font-size:.68rem;color:var(--cream-dim)">${o.timestampStr||''}</span><button data-oid="${o._oid}" onclick="printReceiptByOid(this.dataset.oid)" style="font-size:.62rem;padding:4px 10px;background:transparent;border:1px solid #3a3020;color:var(--cream-dim);border-radius:2px;cursor:pointer;letter-spacing:.1em;text-transform:uppercase;font-family:'Outfit',sans-serif;transition:all .15s ease" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='#3a3020';this.style.color='var(--cream-dim)'">🖨 Print</button></div>
           </div>
           <div class="order-items-list">${itemsHtml}</div>
           ${specialReqHtml}

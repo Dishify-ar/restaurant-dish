@@ -369,7 +369,7 @@
       </model-viewer>
     </div>
     <div class="ar-footer">
-      <p>🥽 Tap <strong>View in AR</strong> and point at a flat surface — the dish appears at real-world scale on your table.</p>
+      <p id="ar-hint-text">🥽 Tap <strong>View in AR</strong> — move your camera slowly over a flat surface and wait for the surface indicator, then tap to place the dish at real scale.</p>
       <button class="ar-launch-btn" onclick="launchAR()">View in AR 📷</button>
     </div>
   </div>
@@ -610,11 +610,10 @@
     function closeMobileDrawer(){document.getElementById('mobile-drawer').classList.remove('open');document.body.style.overflow='';}
 
 
-    // Open QR-marker AR page (MindAR image tracking — global marker, automatic)
+    // Open inline AR modal (no MindAR, no page navigation)
     function openItemAR(itemName, modelSrc){
-      let url='ar.html?r='+encodeURIComponent(rid)+'&item='+encodeURIComponent(itemName);
-      if(modelSrc) url+='&model='+encodeURIComponent(modelSrc);
-      window.location.href=url;
+      if(!modelSrc){ showToast('No 3D model for this item'); return; }
+      openAR(modelSrc, itemName);
     }
 
     // ── AR — proper scale handling (fallback 3D viewer) ──
@@ -635,6 +634,7 @@
             ar ar-modes="webxr scene-viewer quick-look"
             ar-placement="floor"
             ar-scale="fixed"
+            xr-environment
             shadow-intensity="2" shadow-softness="1"
             environment-image="https://modelviewer.dev/shared-assets/environments/moon_1k.hdr"
             exposure="1.3" tone-mapping="commerce"
@@ -645,7 +645,14 @@
         if(bar)bar.style.width='10%';
         if(mv){
           mv.addEventListener('progress',e=>{if(bar)bar.style.width=(e.detail.totalProgress*100)+'%';});
-          mv.addEventListener('load',()=>{if(bar){bar.style.width='100%';setTimeout(()=>bar.style.width='0%',600);}},{once:true});
+          mv.addEventListener('load',()=>{
+            if(bar){bar.style.width='100%';setTimeout(()=>bar.style.width='0%',600);}
+            // On mobile, show AR hint after model loads
+            const isMobile=/android|iphone|ipad/i.test(navigator.userAgent);
+            if(isMobile && mv.canActivateAR){
+              document.getElementById('ar-hint-text').innerHTML='✅ Model ready! Tap <strong>View in AR</strong> — point at a flat surface, wait for dots, then tap to place.';
+            }
+          },{once:true});
           mv.addEventListener('error',()=>{wrap.innerHTML=`<div class="ar-error"><h3>Failed to load</h3><p>The 3D model could not be loaded. The URL may be broken or the file is not a valid .glb.</p></div>`;});
         }
       }
@@ -656,11 +663,17 @@
     function launchAR(){
       const mv=document.getElementById('mv');
       if(!mv){showToast('Model not loaded yet');return;}
+      // WebXR (Chrome Android / Safari iOS 17+)
       if(mv.canActivateAR){mv.activateAR();return;}
+      // Android Scene Viewer fallback
       if(/android/i.test(navigator.userAgent)&&currentModelSrc){
         window.location.href=`intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(currentModelSrc)}&mode=ar_preferred&resizable=false#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(currentModelSrc)};end;`;return;
       }
-      showToast('Tap the cube icon 🥽 in the viewer to launch AR');
+      // iOS Quick Look fallback via USDZ
+      if(/iphone|ipad/i.test(navigator.userAgent)&&currentModelSrc){
+        showToast('Tap the AR icon (cube) in the bottom-right of the viewer 📦');return;
+      }
+      showToast('AR requires Chrome on Android or Safari on iOS 12+');
     }
 
     function closeAR(){

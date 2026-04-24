@@ -75,6 +75,7 @@
       ar-modes="webxr scene-viewer quick-look"
       ar-placement="floor"
       ar-scale="fixed"
+      xr-environment
       shadow-intensity="2"
       shadow-softness="1"
       environment-image="https://modelviewer.dev/shared-assets/environments/moon_1k.hdr"
@@ -86,7 +87,7 @@
   </div>
 
   <div class="bottom-bar">
-    <div class="hint">Rotate &amp; zoom the model, then tap <strong>View in AR</strong> to place it on your table or floor.</div>
+    <div class="hint" id="ar-page-hint">Rotate &amp; zoom the model, then tap <strong>View in AR</strong> to place it on your table or floor.</div>
     <div class="controls-row">
       <button class="ar-btn" id="ar-btn" onclick="launchAR()" disabled>📷 &nbsp;View in AR</button>
       <button class="torch-btn hidden" id="torch-btn" onclick="toggleTorch()" title="Flashlight">🔦</button>
@@ -131,6 +132,7 @@
       const mv=document.getElementById('mv');
       if(!mv) return;
       document.getElementById('torch-btn').classList.remove('hidden');
+      // WebXR native (Chrome Android / Safari iOS 17+)
       if(mv.canActivateAR){ mv.activateAR(); return; }
       // Android Scene Viewer fallback
       if(/android/i.test(navigator.userAgent)&&mv.src){
@@ -139,6 +141,11 @@
           '#Intent;scheme=https;package=com.google.android.googlequicksearchbox;'+
           'action=android.intent.action.VIEW;'+
           'S.browser_fallback_url='+encodeURIComponent(mv.src)+';end;';
+        return;
+      }
+      // iOS — model-viewer handles Quick Look automatically via the AR button in viewer
+      if(/iphone|ipad/i.test(navigator.userAgent)){
+        alert('Tap the AR cube icon (📦) in the bottom-right corner of the 3D viewer to place in AR.');
         return;
       }
       alert('AR is not supported on this device.\nTry Chrome on Android or Safari on iOS.');
@@ -201,8 +208,15 @@
 
       mv.addEventListener('load',function(){
         document.getElementById('loading').classList.add('out');
-        document.getElementById('ar-btn').disabled=false;
-        console.log('[AR] model loaded');
+        const arBtn = document.getElementById('ar-btn');
+        arBtn.disabled=false;
+        const isMobile=/android|iphone|ipad/i.test(navigator.userAgent);
+        if(isMobile && mv.canActivateAR){
+          document.getElementById('ar-page-hint').innerHTML='✅ Model ready! Tap <strong>View in AR</strong> — point at a flat surface, wait for the surface indicator (dots/grid), then tap to place.';
+        } else if(isMobile){
+          document.getElementById('ar-page-hint').innerHTML='✅ Model ready! Tap <strong>View in AR</strong> to launch AR mode.';
+        }
+        console.log('[AR] model loaded, canActivateAR='+mv.canActivateAR);
       },{once:true});
 
       mv.addEventListener('error',function(e){
