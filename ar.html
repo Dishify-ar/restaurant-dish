@@ -4,185 +4,94 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
   <title>AR View — Dishify</title>
-  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <style>
-    :root{--gold:#c9a84c;--ink:#070604;--cream:#f0e8d5;--cream-dim:rgba(240,232,213,.65);--green:#4caf7d}
+    :root { --gold:#c9a84c; --ink:#070604; --cream:#f0e8d5; --dim:rgba(240,232,213,.6); }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{background:var(--ink);color:var(--cream);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100dvh;width:100dvw}
-    body.preview-mode{overflow:auto;height:auto}
+    body{background:var(--ink);color:var(--cream);font-family:'Segoe UI',system-ui,sans-serif;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 
-    /* ── LOADING ── */
-    #loading{position:fixed;inset:0;z-index:9000;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;transition:opacity .5s ease}
+    /* TOP BAR */
+    .topbar{display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(7,6,4,.95);border-bottom:1px solid rgba(201,168,76,.18);flex-shrink:0}
+    .back-btn{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gold);padding:8px 14px;border-radius:4px;font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;flex-shrink:0}
+    .item-name{font-family:Georgia,serif;font-size:1.05rem;color:var(--cream);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* VIEWER */
+    #viewer-wrap{flex:1;position:relative;overflow:hidden}
+    model-viewer{width:100%;height:100%;background-color:#0d0b08;--progress-bar-color:var(--gold);--progress-bar-height:3px}
+
+    /* LOADING */
+    #loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#0d0b08;z-index:5;transition:opacity .4s ease}
     #loading.out{opacity:0;pointer-events:none}
-    .ld-logo{font-family:Georgia,serif;font-size:2rem;font-weight:300;color:var(--gold);letter-spacing:.2em}
-    .ld-ring{width:50px;height:50px;border:2px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .9s linear infinite}
+    .spin{width:40px;height:40px;border:2px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .9s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    #ld-msg{font-size:.76rem;letter-spacing:.22em;text-transform:uppercase;color:var(--cream-dim);text-align:center;padding:0 28px;line-height:1.65;max-width:320px}
+    .load-txt{font-size:.78rem;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
 
-    /* ── ERROR ── */
-    #error{position:fixed;inset:0;z-index:9000;background:var(--ink);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:36px 28px;text-align:center}
+    /* ERROR */
+    #error{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center;background:#0d0b08;z-index:6}
     #error.show{display:flex}
-    .err-icon{font-size:2.8rem}
-    .err-title{font-family:Georgia,serif;font-size:1.5rem;color:var(--gold)}
-    .err-msg{font-size:.84rem;color:var(--cream-dim);line-height:1.75;max-width:340px;white-space:pre-line}
-    .err-btn{margin-top:6px;padding:12px 26px;background:var(--gold);color:var(--ink);border:none;border-radius:3px;font-size:.8rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;text-decoration:none;display:inline-block}
+    .err-icon{font-size:2.4rem}
+    .err-msg{font-size:.88rem;color:var(--dim);line-height:1.7;white-space:pre-line}
+    .err-back{margin-top:8px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gold);padding:11px 22px;border-radius:4px;font-size:.8rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 
-    /* ── HUD ── */
-    #hud{position:fixed;inset:0;z-index:500;pointer-events:none;display:none}
-    #hud.show{display:block}
-
-    #back-btn{position:absolute;top:18px;left:18px;pointer-events:all;background:rgba(7,6,4,.82);border:1px solid rgba(201,168,76,.4);color:var(--gold);padding:10px 16px;border-radius:3px;font-size:.74rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(12px)}
-
-    #item-pill{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:rgba(7,6,4,.84);border:1px solid rgba(201,168,76,.35);backdrop-filter:blur(14px);border-radius:40px;padding:9px 18px;display:flex;align-items:center;gap:9px;white-space:nowrap;max-width:calc(100vw - 150px);overflow:hidden}
-    #item-emoji{font-size:1.2rem;flex-shrink:0}
-    #item-label{font-size:.78rem;font-weight:500;color:var(--cream);overflow:hidden;text-overflow:ellipsis}
-
-    #scan-hint{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(7,6,4,.88);border:1px solid rgba(201,168,76,.3);backdrop-filter:blur(16px);border-radius:16px;padding:18px 22px;text-align:center;max-width:calc(100vw - 48px);width:320px;transition:opacity .4s ease}
-    #scan-hint.gone{opacity:0;pointer-events:none}
-    .hint-marker{width:64px;height:64px;margin:0 auto 10px;border:2px solid var(--gold);border-radius:6px;padding:3px;opacity:.85}
-    .hint-marker svg{display:block;width:100%;height:100%}
-    .hint-text{font-size:.76rem;color:var(--cream-dim);line-height:1.6}
-    .hint-text strong{color:var(--gold)}
-
-    .corners{position:absolute;top:50%;left:50%;transform:translate(-50%,-52%);width:min(68vw,260px);aspect-ratio:1;pointer-events:none}
-    .corners::before,.corners::after,.corners>span::before,.corners>span::after{content:'';position:absolute;width:24px;height:24px;border-color:var(--gold);border-style:solid;animation:pc 2s ease-in-out infinite}
-    .corners::before{top:0;left:0;border-width:2px 0 0 2px}
-    .corners::after{top:0;right:0;border-width:2px 2px 0 0}
-    .corners>span::before{bottom:0;left:0;border-width:0 0 2px 2px}
-    .corners>span::after{bottom:0;right:0;border-width:0 2px 2px 0}
-    @keyframes pc{0%,100%{opacity:.4}50%{opacity:1}}
-    #hud.found .corners{display:none}
-
-    #found-badge{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(76,175,125,.14);border:1px solid rgba(76,175,125,.5);backdrop-filter:blur(14px);border-radius:40px;padding:10px 24px;font-size:.75rem;font-weight:600;color:var(--green);letter-spacing:.15em;text-transform:uppercase;opacity:0;transition:opacity .4s ease;pointer-events:none;white-space:nowrap}
-    #found-badge.show{opacity:1}
-
-    a-scene{position:fixed;inset:0}
-
-    /* ── PREVIEW SCREEN ── */
-    #preview{position:fixed;inset:0;z-index:8500;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding:0 0 40px}
-    #preview.hide{display:none}
-    .pv-header{width:100%;padding:18px 20px 10px;display:flex;align-items:center;gap:12px}
-    .pv-back{background:rgba(7,6,4,.82);border:1px solid rgba(201,168,76,.4);color:var(--gold);padding:9px 14px;border-radius:3px;font-size:.72rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(12px);flex-shrink:0}
-    .pv-title{font-family:Georgia,serif;font-size:1.1rem;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pv-model-wrap{width:100%;max-width:480px;aspect-ratio:1/1;background:#0d0b08;border:1px solid #2a2520;border-radius:8px;overflow:hidden;margin:10px 20px 0;position:relative;align-self:center}
-    .pv-model-wrap model-viewer{width:100%;height:100%;--progress-bar-color:var(--gold)}
-    .pv-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none}
-    .pv-loading.hide{display:none}
-    .pv-spin{width:36px;height:36px;border:2px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .9s linear infinite}
-    .pv-load-txt{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cream-dim)}
-    .pv-error{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center}
-    .pv-error.show{display:flex}
-    .pv-error-icon{font-size:2rem}
-    .pv-error-txt{font-size:.8rem;color:var(--cream-dim);line-height:1.6}
-    .pv-actions{width:100%;max-width:480px;padding:18px 20px 0;display:flex;flex-direction:column;gap:12px;align-self:center}
-    .pv-btn-ar{width:100%;padding:16px;background:var(--gold);color:var(--ink);border:none;border-radius:4px;font-size:.88rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .18s cubic-bezier(.4,0,.2,1)}
-    .pv-btn-ar:hover{background:#dbb85c;transform:translateY(-1px);box-shadow:0 6px 24px rgba(201,168,76,.3)}
-    .pv-btn-ar:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
-    .pv-hint{font-size:.72rem;color:var(--cream-dim);text-align:center;line-height:1.6;padding:0 20px}
-    .pv-item-info{width:100%;max-width:480px;padding:16px 20px 0;align-self:center}
-    .pv-item-name{font-family:Georgia,serif;font-size:1.5rem;color:var(--cream);margin-bottom:6px}
-    .pv-item-sub{font-size:.8rem;color:var(--cream-dim)}
-
-    /* ── FLASHLIGHT BUTTON ── */
-    #flashlight-btn{position:absolute;bottom:18px;right:18px;pointer-events:all;background:rgba(7,6,4,.85);border:1px solid rgba(201,168,76,.35);color:var(--gold);width:46px;height:46px;border-radius:50%;font-size:1.2rem;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(12px);transition:all .2s ease}
-    #flashlight-btn.on{background:rgba(201,168,76,.2);border-color:var(--gold);box-shadow:0 0 12px rgba(201,168,76,.4)}
-    #flashlight-btn.hidden{display:none}
-
-    /* ── MindAR / A-Frame video & canvas fix ─────────────────────────────── */
-    body > video, video[autoplay] {
-      position: fixed !important; top: 0 !important; left: 0 !important;
-      width: 100vw !important; height: 100vh !important;
-      object-fit: cover !important; z-index: 0 !important;
-      display: block !important; visibility: visible !important; opacity: 1 !important;
-    }
-    body > canvas:not([id]), .mindar-ui-overlay canvas {
-      position: fixed !important; top: 0 !important; left: 0 !important;
-      width: 100vw !important; height: 100vh !important;
-      z-index: 1 !important; background: transparent !important;
-      pointer-events: none !important;
-    }
-    a-scene canvas {
-      position: fixed !important; top: 0 !important; left: 0 !important;
-      width: 100vw !important; height: 100vh !important;
-      z-index: 2 !important; background: transparent !important;
-    }
+    /* BOTTOM BAR */
+    .bottom-bar{flex-shrink:0;padding:14px 16px;background:rgba(7,6,4,.95);border-top:1px solid rgba(201,168,76,.18);display:flex;flex-direction:column;gap:10px}
+    .hint{font-size:.75rem;color:var(--dim);text-align:center;line-height:1.6}
+    .controls-row{display:flex;gap:10px}
+    .ar-btn{flex:1;padding:15px;background:var(--gold);color:var(--ink);border:none;border-radius:4px;font-size:.9rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .18s ease}
+    .ar-btn:hover{background:#dbb85c;transform:translateY(-1px)}
+    .ar-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+    .torch-btn{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gold);padding:15px 18px;border-radius:4px;font-size:1.1rem;cursor:pointer;flex-shrink:0;transition:all .18s ease}
+    .torch-btn.on{background:rgba(201,168,76,.25);border-color:var(--gold);box-shadow:0 0 10px rgba(201,168,76,.3)}
+    .torch-btn.hidden{display:none}
   </style>
 </head>
 <body>
 
-  <div id="loading">
-    <div class="ld-logo">DISHIFY</div>
-    <div class="ld-ring"></div>
-    <div id="ld-msg">Starting AR…</div>
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">← Back</button>
+    <div class="item-name" id="item-name">Loading…</div>
   </div>
 
-  <div id="error">
-    <div class="err-icon">⚠️</div>
-    <div class="err-title">AR Unavailable</div>
-    <div class="err-msg" id="err-msg">Something went wrong.</div>
-    <a class="err-btn" id="err-back" href="#">← Back to Menu</a>
+  <div id="viewer-wrap">
+    <div id="loading">
+      <div class="spin"></div>
+      <div class="load-txt" id="load-txt">Loading model…</div>
+    </div>
+    <div id="error">
+      <div class="err-icon">⚠️</div>
+      <div class="err-msg" id="err-msg">Something went wrong.</div>
+      <button class="err-back" onclick="goBack()">← Go Back</button>
+    </div>
+    <model-viewer
+      id="mv"
+      camera-controls
+      touch-action="pan-y"
+      auto-rotate
+      auto-rotate-delay="600"
+      rotation-per-second="18deg"
+      ar
+      ar-modes="webxr scene-viewer quick-look"
+      ar-placement="floor"
+      ar-scale="fixed"
+      shadow-intensity="2"
+      shadow-softness="1"
+      environment-image="https://modelviewer.dev/shared-assets/environments/moon_1k.hdr"
+      exposure="1.3"
+      tone-mapping="commerce"
+      reveal="auto"
+      loading="eager">
+    </model-viewer>
   </div>
 
-  <div id="hud">
-    <button id="back-btn" onclick="goBack()">← Back</button>
-    <div id="item-pill"><span id="item-emoji">🍽️</span><span id="item-label">Loading…</span></div>
-    <div class="corners"><span></span></div>
-    <div id="scan-hint">
-      <div class="hint-marker">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-          <rect width="512" height="512" fill="#fff"/>
-          <rect x="20" y="20" width="472" height="472" fill="none" stroke="#000" stroke-width="20"/>
-          <rect x="40" y="40" width="90" height="90" fill="#000"/><rect x="55" y="55" width="60" height="60" fill="#fff"/><rect x="68" y="68" width="34" height="34" fill="#000"/>
-          <rect x="382" y="40" width="90" height="90" fill="#000"/><rect x="397" y="55" width="60" height="60" fill="#fff"/><rect x="410" y="68" width="34" height="34" fill="#000"/>
-          <rect x="40" y="382" width="90" height="90" fill="#000"/><rect x="55" y="397" width="60" height="60" fill="#fff"/><rect x="68" y="410" width="34" height="34" fill="#000"/>
-          <circle cx="256" cy="256" r="70" fill="#000"/><circle cx="256" cy="256" r="50" fill="#fff"/><circle cx="256" cy="256" r="30" fill="#000"/>
-          <line x1="256" y1="155" x2="256" y2="175" stroke="#000" stroke-width="10"/>
-          <line x1="256" y1="337" x2="256" y2="357" stroke="#000" stroke-width="10"/>
-          <line x1="155" y1="256" x2="175" y2="256" stroke="#000" stroke-width="10"/>
-          <line x1="337" y1="256" x2="357" y2="256" stroke="#000" stroke-width="10"/>
-          <rect x="160" y="160" width="18" height="18" fill="#000"/><rect x="196" y="160" width="18" height="18" fill="#000"/>
-          <rect x="298" y="160" width="18" height="18" fill="#000"/><rect x="334" y="160" width="18" height="18" fill="#000"/>
-          <rect x="160" y="196" width="18" height="18" fill="#000"/><rect x="334" y="196" width="18" height="18" fill="#000"/>
-          <rect x="160" y="298" width="18" height="18" fill="#000"/><rect x="334" y="298" width="18" height="18" fill="#000"/>
-          <rect x="160" y="334" width="18" height="18" fill="#000"/><rect x="196" y="334" width="18" height="18" fill="#000"/>
-          <rect x="298" y="334" width="18" height="18" fill="#000"/><rect x="334" y="334" width="18" height="18" fill="#000"/>
-        </svg>
-      </div>
-      <div class="hint-text">Point your camera at the<br><strong>Dishify marker on your table</strong><br>to see the dish appear in 3D</div>
-    </div>
-    <div id="found-badge">✦ Dish Detected</div>
-    <button id="flashlight-btn" class="hidden" title="Toggle flashlight" onclick="toggleFlashlight()">🔦</button>
-  </div>
-
-  <!-- ── PREVIEW SCREEN ── -->
-  <div id="preview" class="hide">
-    <div class="pv-header">
-      <button class="pv-back" onclick="goBack()">← Back</button>
-      <span class="pv-title" id="pv-title">Loading…</span>
-    </div>
-    <div class="pv-model-wrap" id="pv-model-wrap">
-      <div class="pv-loading" id="pv-loading">
-        <div class="pv-spin"></div>
-        <div class="pv-load-txt">Loading 3D model…</div>
-      </div>
-      <div class="pv-error" id="pv-error">
-        <div class="pv-error-icon">⚠️</div>
-        <div class="pv-error-txt" id="pv-error-txt">Model could not be loaded.</div>
-      </div>
-      <!-- model-viewer injected by JS -->
-    </div>
-    <div class="pv-actions">
-      <button class="pv-btn-ar" id="pv-ar-btn" disabled onclick="launchARCamera()">
-        📷 &nbsp;View in AR (Live Camera)
-      </button>
-      <div class="pv-hint">Point your camera at the Dishify table marker to see this dish appear in 3D</div>
+  <div class="bottom-bar">
+    <div class="hint">Rotate &amp; zoom the model, then tap <strong>View in AR</strong> to place it on your table or floor.</div>
+    <div class="controls-row">
+      <button class="ar-btn" id="ar-btn" onclick="launchAR()" disabled>📷 &nbsp;View in AR</button>
+      <button class="torch-btn hidden" id="torch-btn" onclick="toggleTorch()" title="Flashlight">🔦</button>
     </div>
   </div>
-
-  <div id="scene-container"></div>
 
   <script>
     const firebaseConfig={apiKey:"AIzaSyBvfA2VXcrx69iS-3VaCR9lA6mGyn6OicI",authDomain:"dishify-menu.firebaseapp.com",databaseURL:"https://dishify-menu-default-rtdb.firebaseio.com",projectId:"dishify-menu",storageBucket:"dishify-menu.firebasestorage.app",messagingSenderId:"182873179650",appId:"1:182873179650:web:8ff8cf3c04789d9f7b091b"};
@@ -194,384 +103,121 @@
     const itemName=params.get('item')||'';
     const modelParam=params.get('model')||'';
 
-    // Track any blob URLs we create so we can revoke them on unload
-    let _mindBlobUrl = null;
-    let _modelBlobUrl = null;
-    let _flashTrack = null;   // MediaStreamTrack for torch
-    let _flashOn = false;
-    let _arLaunched = false;  // has user clicked "View in AR" yet?
+    let _torchTrack=null, _torchOn=false;
 
     function goBack(){
-      if(document.referrer.includes('menu.html'))history.back();
+      if(document.referrer.includes('menu.html')) history.back();
       else window.location.href='menu.html?r='+encodeURIComponent(rid);
     }
-    document.getElementById('err-back').href='menu.html?r='+encodeURIComponent(rid);
-
-    function msg(t){ document.getElementById('ld-msg').textContent=t; }
 
     function showError(txt){
-      const loadEl=document.getElementById('loading');
-      loadEl.classList.add('out');
-      setTimeout(()=>{ loadEl.style.display='none'; }, 520);
-      // Also hide preview
-      document.getElementById('preview').classList.add('hide');
+      document.getElementById('loading').classList.add('out');
       document.getElementById('err-msg').textContent=txt;
       document.getElementById('error').classList.add('show');
     }
 
-    // ── URL helpers ───────────────────────────────────────────────────────────
     function convertModelUrl(url){
       if(!url) return '';
-      // Google Drive share links
       const m1=url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if(m1) return `https://drive.google.com/uc?export=download&id=${m1[1]}`;
+      if(m1) return 'https://drive.google.com/uc?export=download&id='+m1[1];
       const m2=url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
-      if(m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
-      // Cloudinary raw URLs — add fl_attachment flag so browser treats it as
-      // a download with proper CORS headers, fixing the "stuck loading" issue.
-      // Works for both /raw/upload/ and /image/upload/ delivery types.
-      if(url.includes('cloudinary.com') && !url.includes('fl_attachment')){
-        url = url.replace('/upload/', '/upload/fl_attachment/');
-      }
+      if(m2) return 'https://drive.google.com/uc?export=download&id='+m2[1];
+      if(url.includes('cloudinary.com')&&!url.includes('fl_attachment'))
+        url=url.replace('/upload/','/upload/fl_attachment/');
       return url;
     }
 
-    function dataUrlToBlobUrl(dataUrl) {
-      try {
-        const [header, b64] = dataUrl.split(',');
-        const mime = header.match(/:(.*?);/)[1];
-        const binStr = atob(b64);
-        const bytes = new Uint8Array(binStr.length);
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-        const blob = new Blob([bytes], { type: mime });
-        return URL.createObjectURL(blob);
-      } catch(e) {
-        console.error('[AR] dataUrlToBlobUrl failed:', e);
-        return null;
+    async function launchAR(){
+      const mv=document.getElementById('mv');
+      if(!mv) return;
+      document.getElementById('torch-btn').classList.remove('hidden');
+      if(mv.canActivateAR){ mv.activateAR(); return; }
+      // Android Scene Viewer fallback
+      if(/android/i.test(navigator.userAgent)&&mv.src){
+        window.location.href='intent://arvr.google.com/scene-viewer/1.0?file='+
+          encodeURIComponent(mv.src)+'&mode=ar_preferred&resizable=false'+
+          '#Intent;scheme=https;package=com.google.android.googlequicksearchbox;'+
+          'action=android.intent.action.VIEW;'+
+          'S.browser_fallback_url='+encodeURIComponent(mv.src)+';end;';
+        return;
       }
+      alert('AR is not supported on this device.\nTry Chrome on Android or Safari on iOS.');
     }
 
-    // ── Flashlight ────────────────────────────────────────────────────────────
-    async function toggleFlashlight(){
-      const btn = document.getElementById('flashlight-btn');
-      if(!_flashTrack){
+    async function toggleTorch(){
+      const btn=document.getElementById('torch-btn');
+      if(!_torchTrack){
         try{
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video:{ facingMode:'environment', advanced:[{torch:true}] }
-          });
-          _flashTrack = stream.getVideoTracks()[0];
-        } catch(e){
-          console.warn('[AR] torch not supported:', e);
-          btn.title = 'Flashlight not supported on this device';
-          btn.style.opacity = '0.4';
+          const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',advanced:[{torch:true}]}});
+          _torchTrack=s.getVideoTracks()[0];
+        }catch(e){ btn.style.opacity='.4'; btn.title='Not supported on this device'; return; }
+      }
+      _torchOn=!_torchOn;
+      try{
+        await _torchTrack.applyConstraints({advanced:[{torch:_torchOn}]});
+        btn.classList.toggle('on',_torchOn);
+        btn.textContent=_torchOn?'💡':'🔦';
+      }catch(e){ console.warn('torch failed',e); }
+    }
+
+    async function init(){
+      if(!rid&&!modelParam){
+        showError('Missing item info.\nPlease scan the QR code again.');
+        return;
+      }
+
+      document.getElementById('item-name').textContent=itemName||'AR Preview';
+
+      let modelUrl='';
+
+      if(modelParam){
+        modelUrl=convertModelUrl(decodeURIComponent(modelParam));
+      }
+
+      if(!modelUrl&&rid&&itemName){
+        try{
+          const snap=await db.ref('restaurants/'+rid).once('value');
+          const restaurant=snap.val();
+          if(restaurant&&restaurant.menu){
+            const item=Object.values(restaurant.menu).find(i=>i.name===itemName);
+            if(item&&item.model){
+              modelUrl=convertModelUrl(item.model);
+              if(item.emoji) document.getElementById('item-name').textContent=item.emoji+' '+itemName;
+            }
+          }
+        }catch(e){
+          showError('Could not connect.\nCheck your internet and try again.');
           return;
         }
       }
-      _flashOn = !_flashOn;
-      try{
-        await _flashTrack.applyConstraints({ advanced:[{torch:_flashOn}] });
-        btn.classList.toggle('on', _flashOn);
-        btn.textContent = _flashOn ? '💡' : '🔦';
-      } catch(e){
-        console.warn('[AR] applyConstraints torch failed:', e);
-      }
-    }
 
-    // ── Preview screen ────────────────────────────────────────────────────────
-    function showPreview(glbUrl, itemObj){
-      // Hide loading overlay
-      const loadEl = document.getElementById('loading');
-      loadEl.classList.add('out');
-      setTimeout(()=>{ loadEl.style.display='none'; }, 520);
-
-      // Fill in item info
-      const emoji = itemObj?.emoji || '🍽️';
-      document.getElementById('pv-title').textContent = emoji + ' ' + itemName;
-      document.getElementById('item-label').textContent = itemName;
-      document.getElementById('item-emoji').textContent = emoji;
-
-      // Build model-viewer in the preview wrap
-      const wrap = document.getElementById('pv-model-wrap');
-      const pvLoading = document.getElementById('pv-loading');
-      const pvError = document.getElementById('pv-error');
-      const arBtn = document.getElementById('pv-ar-btn');
-
-      // Inject model-viewer script if not already there
-      if(!document.querySelector('script[src*="model-viewer"]')){
-        const s = document.createElement('script');
-        s.type = 'module';
-        s.src = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js';
-        document.head.appendChild(s);
-      }
-
-      const mv = document.createElement('model-viewer');
-      mv.setAttribute('src', glbUrl);
-      mv.setAttribute('camera-controls', '');
-      mv.setAttribute('touch-action', 'pan-y');
-      mv.setAttribute('auto-rotate', '');
-      mv.setAttribute('auto-rotate-delay', '500');
-      mv.setAttribute('rotation-per-second', '20deg');
-      mv.setAttribute('shadow-intensity', '1.5');
-      mv.setAttribute('environment-image', 'https://modelviewer.dev/shared-assets/environments/moon_1k.hdr');
-      mv.setAttribute('exposure', '1.2');
-      mv.setAttribute('reveal', 'auto');
-      mv.setAttribute('loading', 'eager');
-      mv.style.cssText = 'width:100%;height:100%;--progress-bar-color:#c9a84c';
-
-      mv.addEventListener('load', ()=>{
-        pvLoading.classList.add('hide');
-        arBtn.disabled = false;
-        console.log('[Preview] model-viewer loaded ✅');
-      }, {once:true});
-
-      mv.addEventListener('error', (e)=>{
-        pvLoading.classList.add('hide');
-        pvError.classList.add('show');
-        document.getElementById('pv-error-txt').textContent =
-          'Could not load 3D model.\nCheck the model URL or re-upload from admin.';
-        console.error('[Preview] model-viewer error:', e);
-      }, {once:true});
-
-      wrap.appendChild(mv);
-      document.getElementById('preview').classList.remove('hide');
-      document.body.classList.add('preview-mode');
-    }
-
-    // ── Launch AR camera (called from "View in AR" button) ────────────────────
-    async function launchARCamera(){
-      if(_arLaunched) return;
-      _arLaunched = true;
-
-      const arBtn = document.getElementById('pv-ar-btn');
-      arBtn.disabled = true;
-      arBtn.textContent = '⏳  Starting camera…';
-
-      // Hide preview, restore scroll lock for AR
-      document.getElementById('preview').classList.add('hide');
-      document.body.classList.remove('preview-mode');
-      const loadEl = document.getElementById('loading');
-      loadEl.style.display = '';
-      loadEl.classList.remove('out');
-      msg('Starting camera…');
-
-      await startAR();
-    }
-
-    // ── Main data-fetch + preview init ────────────────────────────────────────
-    async function init(){
-      if(!rid||!itemName){
-        showError('Missing info. Please scan the table QR code again.');
+      if(!modelUrl){
+        showError('No 3D model found for "'+itemName+'".\nAsk the admin to upload a .glb model for this item.');
         return;
       }
 
-      msg('Loading menu…');
+      const mv=document.getElementById('mv');
+      mv.src=modelUrl;
 
-      let restaurant=null, globalConfig=null;
-      try{
-        const [rSnap,cSnap]=await Promise.all([
-          db.ref('restaurants/'+rid).once('value'),
-          db.ref('config/globalMindTarget').once('value')
-        ]);
-        restaurant=rSnap.val();
-        globalConfig=cSnap.val();
-      } catch(e){
-        showError('Could not connect. Check your internet and try again.');
-        return;
-      }
+      mv.addEventListener('load',function(){
+        document.getElementById('loading').classList.add('out');
+        document.getElementById('ar-btn').disabled=false;
+        console.log('[AR] model loaded');
+      },{once:true});
 
-      if(!restaurant){ showError('Restaurant not found.'); return; }
+      mv.addEventListener('error',function(e){
+        console.error('[AR] model-viewer error',e);
+        showError('Could not load the 3D model.\nThe file may be broken or the link expired.\nAsk the admin to re-upload the model.');
+      },{once:true});
 
-      let item=null;
-      if(restaurant.menu) item=Object.values(restaurant.menu).find(i=>i.name===itemName);
-
-      let glbUrl=modelParam?convertModelUrl(decodeURIComponent(modelParam)):'';
-      if(!glbUrl&&item&&item.model) glbUrl=convertModelUrl(item.model);
-      if(!glbUrl){
-        showError(`No 3D model is set for "${itemName}".\nAsk the restaurant admin to add a .glb model for this dish.`);
-        return;
-      }
-
-      // Store for use in startAR()
-      window._glbUrlResolved = glbUrl;
-      window._itemResolved = item;
-      window._globalConfig = globalConfig;
-
-      // Show preview first — AR camera starts only when user taps the button
-      showPreview(glbUrl, item);
-    }
-
-    // ── AR startup ────────────────────────────────────────────────────────────
-    async function startAR(){
-      const item      = window._itemResolved;
-      const globalCfg = window._globalConfig;
-      let   glbUrl    = window._glbUrlResolved;
-
-      // 1. .mind blob URL
-      const rawMind = globalCfg && globalCfg.url ? globalCfg.url : null;
-      if(!rawMind){
-        showError("The AR marker hasn't been set up yet.\nAsk the admin to compile the global marker.");
-        return;
-      }
-      msg("Preparing AR target...");
-      let mindUrl = rawMind;
-      if(rawMind.startsWith("data:")){
-        mindUrl = dataUrlToBlobUrl(rawMind);
-        if(!mindUrl){ showError("Failed to prepare AR data."); return; }
-        _mindBlobUrl = mindUrl;
-      }
-
-      // 2. Pre-fetch GLB → blob URL
-      msg("Fetching 3D model...");
-      let modelUrl = glbUrl;
-      try{
-        const r = await fetch(glbUrl, { mode:"cors", credentials:"omit" });
-        if(r.ok){
-          const buf = await r.arrayBuffer();
-          modelUrl = URL.createObjectURL(new Blob([buf], {type:"model/gltf-binary"}));
-          _modelBlobUrl = modelUrl;
-          console.log("[AR] GLB blob ready");
-        } else {
-          console.warn("[AR] GLB fetch", r.status, "- using direct URL");
-        }
-      } catch(e){
-        console.warn("[AR] GLB fetch failed - using direct URL:", e.message);
-      }
-
-      msg("Starting camera...");
-
-      const arScaleStr = item && item.arScale ? item.arScale : "0.12 0.12 0.12";
-
-      // 3. Build scene via createElement — the ONLY safe way to pass blob URLs
-      //    Pattern matches the official MindAR working example exactly:
-      //    - a-entity with gltf-model="url(...)" NOT a-gltf-model primitive
-      //    - NO <a-assets> / asset system (causes race conditions with blob URLs)
-      //    - mindar-image set on a-scene via setAttribute after element creation
-
-      const sceneEl = document.createElement("a-scene");
-      sceneEl.setAttribute("color-space", "sRGB");
-      sceneEl.setAttribute("renderer", "colorManagement: true; physicallyCorrectLights: true; alpha: true;");
-      sceneEl.setAttribute("vr-mode-ui", "enabled: false");
-      sceneEl.setAttribute("device-orientation-permission-ui", "enabled: false");
-      sceneEl.setAttribute("loading-screen", "enabled: false");
-      sceneEl.setAttribute("embedded", "true");
-      sceneEl.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2;";
-
-      // Set mindar-image via setAttribute (not innerHTML) so mindUrl blob is safe
-      sceneEl.setAttribute("mindar-image",
-        "imageTargetSrc: " + mindUrl +
-        "; filterMinCF: 0.001; filterBeta: 0.001" +
-        "; uiLoading: no; uiScanning: no; uiError: no");
-
-      // Camera
-      const camEl = document.createElement("a-camera");
-      camEl.setAttribute("position", "0 0 0");
-      camEl.setAttribute("look-controls", "enabled: false");
-      sceneEl.appendChild(camEl);
-
-      // Lights
-      const amb = document.createElement("a-light");
-      amb.setAttribute("type", "ambient");
-      amb.setAttribute("color", "#ffffff");
-      amb.setAttribute("intensity", "2");
-      sceneEl.appendChild(amb);
-
-      const dir = document.createElement("a-light");
-      dir.setAttribute("type", "directional");
-      dir.setAttribute("color", "#ffffff");
-      dir.setAttribute("intensity", "2.5");
-      dir.setAttribute("position", "1 2 1");
-      sceneEl.appendChild(dir);
-
-      // Target anchor entity
-      const targetEl = document.createElement("a-entity");
-      targetEl.setAttribute("id", "ar-target");
-      targetEl.setAttribute("mindar-image-target", "targetIndex: 0");
-
-      // Model entity — a-entity + gltf-model="url(...)" is the proven working pattern
-      const modelEl = document.createElement("a-entity");
-      modelEl.setAttribute("id", "dish-model");
-      modelEl.setAttribute("gltf-model", "url(" + modelUrl + ")");
-      modelEl.setAttribute("position", "0 0 0.06");
-      modelEl.setAttribute("rotation", "-90 0 0");
-      modelEl.setAttribute("scale", arScaleStr);
-      modelEl.setAttribute("animation",
-        "property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 8000; easing: linear");
-
-      // Gold ring
-      const ringEl = document.createElement("a-ring");
-      ringEl.setAttribute("color", "#c9a84c");
-      ringEl.setAttribute("radius-inner", "0.08");
-      ringEl.setAttribute("radius-outer", "0.14");
-      ringEl.setAttribute("position", "0 0 0.001");
-      ringEl.setAttribute("rotation", "-90 0 0");
-      ringEl.setAttribute("opacity", "0.3");
-      ringEl.setAttribute("material", "transparent: true; side: double");
-
-      targetEl.appendChild(modelEl);
-      targetEl.appendChild(ringEl);
-      sceneEl.appendChild(targetEl);
-
-      // Mount scene
-      const container = document.getElementById("scene-container");
-      container.innerHTML = "";
-      container.appendChild(sceneEl);
-
-      // 4. AR events
-      sceneEl.addEventListener("arReady", function(){
-        console.log("[AR] arReady ✅");
-        document.getElementById("loading").classList.add("out");
-        document.getElementById("hud").classList.add("show");
-        document.getElementById("flashlight-btn").classList.remove("hidden");
-        document.getElementById("item-label").textContent = item ? item.name : "";
-        document.getElementById("item-emoji").textContent = item && item.emoji ? item.emoji : "🍽️";
-
-        // Fix video feed visibility
-        setTimeout(function(){
-          document.querySelectorAll("video").forEach(function(v){
-            v.style.cssText = "position:fixed!important;top:0!important;left:0!important;" +
-              "width:100vw!important;height:100vh!important;object-fit:cover!important;" +
-              "z-index:0!important;display:block!important;visibility:visible!important;opacity:1!important";
-          });
-        }, 200);
-      }, {once: true});
-
-      sceneEl.addEventListener("arError", function(){
-        showError("Camera could not start.\nPlease allow camera access and reload.");
-      }, {once: true});
-
-      targetEl.addEventListener("targetFound", function(){
-        console.log("[AR] targetFound ✅");
-        document.getElementById("hud").classList.add("found");
-        document.getElementById("scan-hint").classList.add("gone");
-        document.getElementById("found-badge").classList.add("show");
-      });
-
-      targetEl.addEventListener("targetLost", function(){
-        document.getElementById("hud").classList.remove("found");
-        document.getElementById("scan-hint").classList.remove("gone");
-        document.getElementById("found-badge").classList.remove("show");
-      });
-
-      modelEl.addEventListener("model-loaded", function(){
-        console.log("[AR] model-loaded ✅");
-      });
-      modelEl.addEventListener("model-error", function(e){
-        console.error("[AR] model-error ❌", e.detail || e);
-        showError("3D model failed to load.\nPlease try again.");
-      });
-
-      // Timeout fallback
       setTimeout(function(){
-        if(!document.getElementById("hud").classList.contains("show")){
-          showError("AR is taking too long.\n\nCheck:\n- Camera permission allowed\n- Chrome on Android / Safari on iOS\n- Page on HTTPS");
-        }
-      }, 25000);
+        if(!document.getElementById('loading').classList.contains('out'))
+          document.getElementById('load-txt').textContent='Still loading… (large file)';
+      },7000);
     }
-    // Clean up on unload
-    window.addEventListener('pagehide', function(){
-      if(_mindBlobUrl)  URL.revokeObjectURL(_mindBlobUrl);
-      if(_modelBlobUrl) URL.revokeObjectURL(_modelBlobUrl);
-      if(_flashTrack){ try{ _flashTrack.stop(); }catch(e){} }
+
+    window.addEventListener('pagehide',function(){
+      if(_torchTrack){try{_torchTrack.stop();}catch(e){}}
     });
 
     init();
