@@ -400,7 +400,7 @@
       showPreview(glbUrl, item);
     }
 
-    // ── AR startup — A-Frame 1.4 + MindAR 1.2.5 ─────────────────────────────
+    // ── AR startup ────────────────────────────────────────────────────────────
     async function startAR(){
       const item      = window._itemResolved;
       const globalCfg = window._globalConfig;
@@ -409,7 +409,7 @@
       // 1. .mind blob URL
       const rawMind = globalCfg && globalCfg.url ? globalCfg.url : null;
       if(!rawMind){
-        showError("The AR marker hasn't been set up yet.\nAsk the admin to compile the global marker in the Admin Panel.");
+        showError("The AR marker hasn't been set up yet.\nAsk the admin to compile the global marker.");
         return;
       }
       msg("Preparing AR target...");
@@ -420,95 +420,82 @@
         _mindBlobUrl = mindUrl;
       }
 
-      // 2. Pre-fetch GLB -> blob (eliminates CORS inside A-Frame loader)
+      // 2. Pre-fetch GLB → blob URL
       msg("Fetching 3D model...");
-      let modelBlobUrl = glbUrl;
+      let modelUrl = glbUrl;
       try{
         const r = await fetch(glbUrl, { mode:"cors", credentials:"omit" });
         if(r.ok){
           const buf = await r.arrayBuffer();
-          modelBlobUrl = URL.createObjectURL(new Blob([buf], {type:"model/gltf-binary"}));
-          _modelBlobUrl = modelBlobUrl;
-          console.log("[AR] GLB blob ready:", modelBlobUrl.slice(0,40));
+          modelUrl = URL.createObjectURL(new Blob([buf], {type:"model/gltf-binary"}));
+          _modelBlobUrl = modelUrl;
+          console.log("[AR] GLB blob ready");
         } else {
-          console.warn("[AR] fetch", r.status, "- using direct URL");
+          console.warn("[AR] GLB fetch", r.status, "- using direct URL");
         }
       } catch(e){
-        console.warn("[AR] fetch failed:", e.message, "- using direct URL");
+        console.warn("[AR] GLB fetch failed - using direct URL:", e.message);
       }
 
-      msg("Building scene...");
+      msg("Starting camera...");
 
       const arScaleStr = item && item.arScale ? item.arScale : "0.12 0.12 0.12";
 
-      // ── Build entire A-Frame scene via createElement (NEVER innerHTML for blob URLs) ──
+      // 3. Build scene via createElement — the ONLY safe way to pass blob URLs
+      //    Pattern matches the official MindAR working example exactly:
+      //    - a-entity with gltf-model="url(...)" NOT a-gltf-model primitive
+      //    - NO <a-assets> / asset system (causes race conditions with blob URLs)
+      //    - mindar-image set on a-scene via setAttribute after element creation
 
-      // <a-scene>
       const sceneEl = document.createElement("a-scene");
-      sceneEl.setAttribute("mindar-image",
-        "imageTargetSrc: " + mindUrl +
-        "; filterMinCF: 0.001; filterBeta: 0.001" +
-        "; webcamFacingMode: environment" +
-        "; uiLoading: no; uiScanning: no; uiError: no");
       sceneEl.setAttribute("color-space", "sRGB");
       sceneEl.setAttribute("renderer", "colorManagement: true; physicallyCorrectLights: true; alpha: true;");
       sceneEl.setAttribute("vr-mode-ui", "enabled: false");
       sceneEl.setAttribute("device-orientation-permission-ui", "enabled: false");
       sceneEl.setAttribute("loading-screen", "enabled: false");
       sceneEl.setAttribute("embedded", "true");
-      sceneEl.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2";
+      sceneEl.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2;";
 
-      // <a-assets>
-      const assetsEl = document.createElement("a-assets");
-      assetsEl.setAttribute("timeout", "30000");
+      // Set mindar-image via setAttribute (not innerHTML) so mindUrl blob is safe
+      sceneEl.setAttribute("mindar-image",
+        "imageTargetSrc: " + mindUrl +
+        "; filterMinCF: 0.001; filterBeta: 0.001" +
+        "; uiLoading: no; uiScanning: no; uiError: no");
 
-      // <a-asset-item> — src set via JS property, not attribute, to handle blob URLs safely
-      const assetItem = document.createElement("a-asset-item");
-      assetItem.setAttribute("id", "dish-model");
-      assetItem.setAttribute("src", modelBlobUrl);  // safe: direct property on created element
-      assetsEl.appendChild(assetItem);
-      sceneEl.appendChild(assetsEl);
-
-      // <a-camera>
+      // Camera
       const camEl = document.createElement("a-camera");
       camEl.setAttribute("position", "0 0 0");
       camEl.setAttribute("look-controls", "enabled: false");
       sceneEl.appendChild(camEl);
 
-      // lights
+      // Lights
       const amb = document.createElement("a-light");
       amb.setAttribute("type", "ambient");
       amb.setAttribute("color", "#ffffff");
       amb.setAttribute("intensity", "2");
       sceneEl.appendChild(amb);
 
-      const dir1 = document.createElement("a-light");
-      dir1.setAttribute("type", "directional");
-      dir1.setAttribute("color", "#ffffff");
-      dir1.setAttribute("intensity", "2.5");
-      dir1.setAttribute("position", "1 2 1");
-      sceneEl.appendChild(dir1);
+      const dir = document.createElement("a-light");
+      dir.setAttribute("type", "directional");
+      dir.setAttribute("color", "#ffffff");
+      dir.setAttribute("intensity", "2.5");
+      dir.setAttribute("position", "1 2 1");
+      sceneEl.appendChild(dir);
 
-      const dir2 = document.createElement("a-light");
-      dir2.setAttribute("type", "directional");
-      dir2.setAttribute("color", "#ffffff");
-      dir2.setAttribute("intensity", "1.5");
-      dir2.setAttribute("position", "-1 1 -1");
-      sceneEl.appendChild(dir2);
-
-      // <a-entity mindar-image-target> — the anchor
+      // Target anchor entity
       const targetEl = document.createElement("a-entity");
       targetEl.setAttribute("id", "ar-target");
       targetEl.setAttribute("mindar-image-target", "targetIndex: 0");
 
-      // <a-gltf-model> inside the target
-      const modelEl = document.createElement("a-gltf-model");
-      modelEl.setAttribute("id", "dish-gltf");
-      modelEl.setAttribute("src", "#dish-model");   // reference by asset ID
+      // Model entity — a-entity + gltf-model="url(...)" is the proven working pattern
+      const modelEl = document.createElement("a-entity");
+      modelEl.setAttribute("id", "dish-model");
+      modelEl.setAttribute("gltf-model", "url(" + modelUrl + ")");
       modelEl.setAttribute("position", "0 0 0.06");
       modelEl.setAttribute("rotation", "-90 0 0");
       modelEl.setAttribute("scale", arScaleStr);
-      modelEl.setAttribute("visible", "true");
+      modelEl.setAttribute("animation",
+        "property: rotation; from: -90 0 0; to: -90 360 0; loop: true; dur: 8000; easing: linear");
 
       // Gold ring
       const ringEl = document.createElement("a-ring");
@@ -524,103 +511,61 @@
       targetEl.appendChild(ringEl);
       sceneEl.appendChild(targetEl);
 
-      // Insert scene into container
+      // Mount scene
       const container = document.getElementById("scene-container");
       container.innerHTML = "";
       container.appendChild(sceneEl);
 
-      // ── Wait for model to load, then start AR ────────────────────────────
-      // A-Frame's asset system fires "loaded" on <a-assets> when all items
-      // are ready. We MUST wait for this before MindAR starts, otherwise the
-      // model entity has no geometry and renders nothing.
+      // 4. AR events
+      sceneEl.addEventListener("arReady", function(){
+        console.log("[AR] arReady ✅");
+        document.getElementById("loading").classList.add("out");
+        document.getElementById("hud").classList.add("show");
+        document.getElementById("flashlight-btn").classList.remove("hidden");
+        document.getElementById("item-label").textContent = item ? item.name : "";
+        document.getElementById("item-emoji").textContent = item && item.emoji ? item.emoji : "🍽️";
 
-      let arStarted = false;
-
-      function doStartAR(){
-        if(arStarted) return;
-        arStarted = true;
-
-        console.log("[AR] Assets loaded, starting AR...");
-        msg("Starting camera...");
-
-        // model-loaded fires on the gltf element when geometry is parsed
-        modelEl.addEventListener("model-loaded", function(){
-          console.log("[AR] model-loaded event fired ✅");
-        });
-        modelEl.addEventListener("model-error", function(e){
-          console.error("[AR] model-error ❌", e.detail);
-        });
-
-        sceneEl.addEventListener("arReady", function(){
-          console.log("[AR] arReady ✅");
-          document.getElementById("loading").classList.add("out");
-          document.getElementById("hud").classList.add("show");
-          document.getElementById("flashlight-btn").classList.remove("hidden");
-          document.getElementById("item-label").textContent  = item ? item.name  : "";
-          document.getElementById("item-emoji").textContent  = item && item.emoji ? item.emoji : "🍽️";
-
-          // Video visibility fix
-          setTimeout(function fixVideo(){
-            document.querySelectorAll("video").forEach(function(v){
-              v.style.cssText = "position:fixed!important;top:0!important;left:0!important;" +
-                "width:100vw!important;height:100vh!important;object-fit:cover!important;" +
-                "z-index:0!important;display:block!important;visibility:visible!important;opacity:1!important";
-            });
-          }, 200);
-
-          // Target events
-          targetEl.addEventListener("targetFound", function(){
-            console.log("[AR] targetFound");
-            document.getElementById("hud").classList.add("found");
-            document.getElementById("scan-hint").classList.add("gone");
-            document.getElementById("found-badge").classList.add("show");
-
-            // Force visible at THREE.js level - this is what actually matters
-            setTimeout(function(){
-              if(modelEl.object3D){
-                modelEl.object3D.visible = true;
-                modelEl.object3D.traverse(function(n){ n.visible = true; });
-              }
-              if(targetEl.object3D){
-                targetEl.object3D.visible = true;
-              }
-              console.log("[AR] forced object3D visible");
-            }, 0);
-          });
-
-          targetEl.addEventListener("targetLost", function(){
-            document.getElementById("hud").classList.remove("found");
-            document.getElementById("scan-hint").classList.remove("gone");
-            document.getElementById("found-badge").classList.remove("show");
-          });
-        }, {once: true});
-
-        sceneEl.addEventListener("arError", function(){
-          document.getElementById("loading").classList.add("out");
-          showError("Camera could not start.\nPlease allow camera access and reload.");
-        }, {once: true});
-
-        // Safety timeout
+        // Fix video feed visibility
         setTimeout(function(){
-          if(!document.getElementById("hud").classList.contains("show")){
-            showError("AR is taking too long.\n\nPlease check:\n- Camera permission allowed\n- Using Chrome (Android) or Safari (iOS)\n- Page served over HTTPS");
-          }
-        }, 25000);
-      }
-
-      // Wait for <a-assets> loaded event, with fallback timeout
-      assetsEl.addEventListener("loaded", function(){
-        console.log("[AR] a-assets loaded ✅");
-        doStartAR();
+          document.querySelectorAll("video").forEach(function(v){
+            v.style.cssText = "position:fixed!important;top:0!important;left:0!important;" +
+              "width:100vw!important;height:100vh!important;object-fit:cover!important;" +
+              "z-index:0!important;display:block!important;visibility:visible!important;opacity:1!important";
+          });
+        }, 200);
       }, {once: true});
 
-      // Fallback: if assets take too long or already loaded, start anyway
+      sceneEl.addEventListener("arError", function(){
+        showError("Camera could not start.\nPlease allow camera access and reload.");
+      }, {once: true});
+
+      targetEl.addEventListener("targetFound", function(){
+        console.log("[AR] targetFound ✅");
+        document.getElementById("hud").classList.add("found");
+        document.getElementById("scan-hint").classList.add("gone");
+        document.getElementById("found-badge").classList.add("show");
+      });
+
+      targetEl.addEventListener("targetLost", function(){
+        document.getElementById("hud").classList.remove("found");
+        document.getElementById("scan-hint").classList.remove("gone");
+        document.getElementById("found-badge").classList.remove("show");
+      });
+
+      modelEl.addEventListener("model-loaded", function(){
+        console.log("[AR] model-loaded ✅");
+      });
+      modelEl.addEventListener("model-error", function(e){
+        console.error("[AR] model-error ❌", e.detail || e);
+        showError("3D model failed to load.\nPlease try again.");
+      });
+
+      // Timeout fallback
       setTimeout(function(){
-        if(!arStarted){
-          console.warn("[AR] a-assets timeout - starting anyway");
-          doStartAR();
+        if(!document.getElementById("hud").classList.contains("show")){
+          showError("AR is taking too long.\n\nCheck:\n- Camera permission allowed\n- Chrome on Android / Safari on iOS\n- Page on HTTPS");
         }
-      }, 8000);
+      }, 25000);
     }
     // Clean up on unload
     window.addEventListener('pagehide', function(){
